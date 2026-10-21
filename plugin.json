@@ -1,0 +1,18 @@
+{
+  "slug": "MyLilToolbox",
+  "name": "My lil Toolbox",
+  "version": "2.0.0",
+  "license": "MIT",
+  "brand": "A_Development",
+  "author": "Ari Klopfer",
+  "authorEmail": "",
+  "authorUrl": "",
+  "pluginUrl": "",
+  "manualUrl": "https://github.com/Adev-io/my-lil-toolbox#readme",
+  "sourceUrl": "https://github.com/Adev-io/my-lil-toolbox",
+  "donateUrl": "",
+  "changelogUrl": "",
+  "modules": [
+    { "slug": "Arpeggio", "name": "Arpeggio", "description": "Dual quantizer and arpeggiator sharing one scale: 10 presets, an editable keyboard, and a scale-degree interval for in-key harmony", "tags": ["Quantizer", "Arpeggiator", "Random", "Dual"] }
+  ]
+}
