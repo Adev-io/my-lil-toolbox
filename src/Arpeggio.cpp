@@ -20,6 +20,7 @@ struct Arpeggio : Module
     dsp::PulseGenerator pulseA, pulseB;
     dsp::ClockDivider lightDiv;
     int lastType = -1;   // TYPE index whose preset the keys last loaded; -1 = load on the next sample
+    int typeSettle = 0;   // samples to ignore TYPE after a patch load: cables read 0 V until upstream modules run
     int dir = arp::UP;
     bool passThrough = false;
 
@@ -31,6 +32,7 @@ struct Arpeggio : Module
         std::vector<std::string> names;
         for (int i = 0; i < scale::numPresets; ++i) names.push_back (scale::presetName (i));
         configSwitch (TYPE_PARAM, 0.f, scale::numPresets - 1, 0.f, "Scale type (loads a preset into the keys)", names);
+        getParamQuantity (TYPE_PARAM)->randomizeEnabled = false;   // Randomize rolls the keys; TYPE stays put
         configButton (RAND_PARAM, "Random scale");
         configSwitch (MODE_PARAM, 0.f, 1.f, 0.f, "Mode", { "Quantizer", "Arpeggiator" });
         configButton (DIR_PARAM, "Arp direction: up, down, up-down, random");
@@ -61,8 +63,12 @@ struct Arpeggio : Module
     void process (const ProcessArgs& args) override
     {
         // the scale: TYPE loads a preset when its index changes, RANDOM rolls one, the key latches hold it
-        const int t = scale::typeIndex (params[TYPE_PARAM].getValue() + inputs[TYPE_INPUT].getVoltage(), lastType);
-        if (t != lastType) { lastType = t; setKeys (scale::preset (t)); }
+        if (typeSettle > 0) --typeSettle;
+        else
+        {
+            const int t = scale::typeIndex (params[TYPE_PARAM].getValue() + inputs[TYPE_INPUT].getVoltage(), lastType);
+            if (t != lastType) { lastType = t; setKeys (scale::preset (t)); }
+        }
         const bool randPressed = randBtn.process (params[RAND_PARAM].getValue() > 0.f);
         const bool randTrigged = randTrig.process (inputs[RAND_INPUT].getVoltage(), 0.1f, 1.f);
         if (randPressed || randTrigged) setKeys (scale::randomMask (rng));
@@ -121,8 +127,9 @@ struct Arpeggio : Module
         for (int d = 0; d < arp::NUM_DIRS; ++d) lights[DIR_LIGHT + d].setBrightness (d == dir ? 1.f : 0.f);
     }
 
-    void onReset() override   // params are back at their defaults: all keys off, TYPE 0
+    void onReset (const ResetEvent& e) override   // the base resets params first: all keys off, TYPE 0
     {
+        Module::onReset (e);
         lastType = -1;   // the next sample loads major into the keys
         dir = arp::UP;
         passThrough = false;
@@ -144,6 +151,7 @@ struct Arpeggio : Module
         if (json_t* j = json_object_get (root, "type")) lastType = clamp ((int) json_integer_value (j), -1, scale::numPresets - 1);
         if (json_t* j = json_object_get (root, "dir")) dir = clamp ((int) json_integer_value (j), 0, arp::NUM_DIRS - 1);
         if (json_t* j = json_object_get (root, "passThrough")) passThrough = json_boolean_value (j);
+        typeSettle = 64;
     }
 };
 
