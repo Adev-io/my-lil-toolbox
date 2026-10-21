@@ -54,4 +54,23 @@ inline int typeIndex (float v, int current)
 }
 
 inline float clampV (float v) { return v < -10.f ? -10.f : v > 10.f ? 10.f : v; }
+
+// Nearest in-mask semitone to a continuous semitone value; ties go to the lower pitch. mask must not be 0.
+// No truncation toward zero: works the same below 0 V.
+inline int nearest (float semis, uint16_t mask)
+{
+    const int base = (int) std::floor (semis);
+    int best = base;
+    float bestD = 1e9f;
+    for (int s = base - 12; s <= base + 13; ++s)   // ascending, so the lower pitch wins a tie
+    {
+        if (! inMask (s, mask)) continue;
+        const float d = std::fabs ((float) s - semis);
+        if (d < bestD - 1e-4f) { bestD = d; best = s; }   // 1e-4 semitone slack: float ties count as ties
+    }
+    return best;
+}
+
+// Volts in, quantized volts out. Empty mask: the voltage passes through unchanged.
+inline float quantize (float volts, uint16_t mask) { return mask ? nearest (volts * 12.f, mask) / 12.f : volts; }
 }

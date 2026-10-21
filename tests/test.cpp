@@ -52,6 +52,35 @@ void testRngAndClamp()
     check (z.next() != 0, "rng: seed 0 still runs");
     check (scale::clampV (15.f) == 10.f && scale::clampV (-15.f) == -10.f && scale::clampV (1.5f) == 1.5f, "clampV");
 }
+// Reference: nearest in-mask semitone to an integer semitone, the lower one on a tie.
+int refNearest (int s, uint16_t mask)
+{
+    for (int d = 0; d <= 12; ++d)
+    {
+        if (scale::inMask (s - d, mask)) return s - d;
+        if (scale::inMask (s + d, mask)) return s + d;
+    }
+    return s;
+}
+
+void testQuantize()
+{
+    bool all = true;
+    for (int i = 0; i < scale::numPresets; ++i)
+        for (int s = -12; s <= 23; ++s)   // three octaves, -1 V .. +2 V
+            all = all && near (scale::quantize (s / 12.f, scale::preset (i)), refNearest (s, scale::preset (i)) / 12.0);
+    check (all, "quantize table: 10 presets x 3 octaves");
+    const uint16_t cb = maskOf ({ 0, 11 });
+    check (near (scale::quantize (-0.01f, cb), 0.0), "quantize: -0.01 V snaps up to C4", scale::quantize (-0.01f, cb));
+    check (near (scale::quantize (-0.05f, cb), -1.0 / 12), "quantize: -0.05 V snaps down to B3", scale::quantize (-0.05f, cb));
+    const uint16_t cd = maskOf ({ 0, 2 });
+    check (near (scale::quantize (1.f / 12, cd), 0.0), "quantize: a tie goes to the lower note");
+    check (near (scale::quantize (1.2f / 12, cd), 2.0 / 12), "quantize: past the middle goes up");
+    check (scale::quantize (0.123f, 0) == 0.123f, "quantize: empty mask passes through");
+    check (near (scale::quantize (5.f, scale::preset (0)), 5.0) && near (scale::quantize (-3.f, scale::preset (8)), -3.0),
+           "quantize: C in any octave stays put");
+    check (scale::nearest (1.1f, scale::preset (0)) == 2, "nearest: C# + 0.1 in major is D");
+}
 // ---- tests (each task adds its functions above this line)
 }
 
@@ -60,6 +89,7 @@ int main()
     testPresets();
     testTypeIndex();
     testRngAndClamp();
+    testQuantize();
     // ---- calls (each task adds its calls above this line)
     std::printf ("\n%s: %d failure(s)\n", failures ? "FAILED" : "PASSED", failures);
     return failures ? 1 : 0;
