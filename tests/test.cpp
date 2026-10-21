@@ -1,6 +1,7 @@
 // test.cpp: checks the core (scale, arp, section) with plain asserts. Run: make test
 // Author: Ari Klopfer / A_Development · MIT
 #include "Scale.h"
+#include "Arp.h"
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
@@ -115,6 +116,65 @@ void testRandomMask()
     check (cAlways && noHigh, "random mask: C always in, nothing past B");
     check (varies && everyBitBoth, "random mask: every other note both on and off over 100 rolls");
 }
+// Steps n times and returns the pitches.
+std::vector<int> run (arp::Arp& a, arp::Dir d, int n)
+{
+    std::vector<int> v;
+    for (int i = 0; i < n; ++i) v.push_back (a.step (d));
+    return v;
+}
+
+void testArpPool()
+{
+    arp::Arp a;
+    a.build (0, scale::preset (0), 1);
+    check (a.size == 7 && a.pool[0] == 0 && a.pool[6] == 11, "pool: major, 1 octave", a.size);
+    a.build (0, scale::preset (0), 2);
+    check (a.size == 14 && a.pool[13] == 23, "pool: major, 2 octaves", a.size);
+    a.build (2, scale::preset (0), 1);
+    check (a.size == 7 && a.pool[0] == 2 && a.pool[6] == 12, "pool: starts at the base note (D)");
+    a.build (0, 0xFFF, 4);
+    check (a.size == arp::maxPool && a.pool[47] == 47, "pool: chromatic, 4 octaves fills it", a.size);
+    a.build (0, 0xFFF, 9);
+    check (a.size == arp::maxPool, "pool: octaves clamp to 4", a.size);
+    a.build (5, 0, 3);
+    check (a.size == 1 && a.pool[0] == 5, "pool: empty mask holds the base note");
+}
+
+void testArpDirections()
+{
+    arp::Arp a;
+    a.build (0, scale::preset (0), 1);
+    check (run (a, arp::UP, 8) == std::vector<int> { 0, 2, 4, 5, 7, 9, 11, 0 }, "arp: up starts low and wraps");
+    a.reset();
+    check (run (a, arp::DOWN, 8) == std::vector<int> { 11, 9, 7, 5, 4, 2, 0, 11 }, "arp: down starts on top after reset, wraps");
+    arp::Arp b;
+    b.build (0, maskOf ({ 0, 4, 7 }), 1);
+    check (run (b, arp::UPDOWN, 7) == std::vector<int> { 0, 4, 7, 4, 0, 4, 7 }, "arp: up-down does not repeat the ends");
+    b.step (arp::UPDOWN);   // now heading down
+    b.reset();
+    check (run (b, arp::UPDOWN, 3) == std::vector<int> { 0, 4, 7 }, "arp: reset, up-down restarts going up");
+    arp::Arp c;
+    c.build (0, scale::preset (0), 1);
+    run (c, arp::UP, 3);
+    c.reset();
+    check (c.step (arp::UP) == 0, "arp: reset, up plays the lowest note next");
+}
+
+void testArpEdges()
+{
+    arp::Arp a;
+    a.build (0, scale::preset (0), 1);
+    run (a, arp::UP, 7);                       // on index 6 (B)
+    a.build (0, maskOf ({ 0, 4, 7 }), 1);      // pool shrinks to 3: index 6 wraps to 0
+    check (a.idx == 0 && a.step (arp::UP) == 4, "arp: a shrinking pool wraps the index");
+    arp::Arp one;
+    one.build (0, maskOf ({ 0 }), 2);
+    check (run (one, arp::UP, 4) == std::vector<int> { 0, 12, 0, 12 }, "arp: single-note scale repeats it each octave");
+    arp::Arp solo;
+    solo.build (3, maskOf ({ 3 }), 1);
+    check (run (solo, arp::RANDOM, 3) == std::vector<int> { 3, 3, 3 }, "arp: a pool of 1 repeats, even in random");
+}
 // ---- tests (each task adds its functions above this line)
 }
 
@@ -126,6 +186,9 @@ int main()
     testQuantize();
     testDegrees();
     testRandomMask();
+    testArpPool();
+    testArpDirections();
+    testArpEdges();
     // ---- calls (each task adds its calls above this line)
     std::printf ("\n%s: %d failure(s)\n", failures ? "FAILED" : "PASSED", failures);
     return failures ? 1 : 0;
