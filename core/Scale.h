@@ -53,7 +53,7 @@ inline int typeIndex (float v, int current)
     return i < 0 ? 0 : i > numPresets - 1 ? numPresets - 1 : i;
 }
 
-inline float clampV (float v) { return v < -10.f ? -10.f : v > 10.f ? 10.f : v; }
+inline float clampV (float v) { return v != v ? 0.f : v < -10.f ? -10.f : v > 10.f ? 10.f : v; }   // NaN reads as 0 V
 
 // Nearest in-mask semitone to a continuous semitone value; ties go to the lower pitch. mask must not be 0.
 // No truncation toward zero: works the same below 0 V.

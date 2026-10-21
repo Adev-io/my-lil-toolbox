@@ -51,6 +51,7 @@ void testRngAndClamp()
     check (same, "rng: same seed, same stream");
     check (z.next() != 0, "rng: seed 0 still runs");
     check (scale::clampV (15.f) == 10.f && scale::clampV (-15.f) == -10.f && scale::clampV (1.5f) == 1.5f, "clampV");
+    check (scale::clampV (std::nanf ("")) == 0.f, "clampV: NaN reads as 0 V");
 }
 // Reference: nearest in-mask semitone to an integer semitone, the lower one on a tie.
 int refNearest (int s, uint16_t mask)
