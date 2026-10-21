@@ -2,6 +2,7 @@
 // Author: Ari Klopfer / A_Development · MIT
 #include "Scale.h"
 #include "Arp.h"
+#include "Section.h"
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
@@ -203,6 +204,97 @@ void testArpRandom()
     f.reset();
     check (f.step (arp::RANDOM) == 0, "arp random: reset plays the lowest note next");
 }
+section::Settings majorSettings()
+{
+    section::Settings s;
+    s.mask = scale::preset (0);
+    return s;
+}
+
+void testSectionQuantizer()
+{
+    section::Settings s = majorSettings();
+    section::Section q;
+    section::Out o = q.process (1.1f / 12, false, false, s);
+    check (near (o.volts, 2.0 / 12) && o.pc == 2 && ! o.trig, "section: continuous quantize, no trigger on the first note");
+    o = q.process (4.f / 12, false, false, s);
+    check (near (o.volts, 4.0 / 12) && o.trig, "section: a new note fires TRIG out");
+    o = q.process (4.2f / 12, false, false, s);
+    check (! o.trig, "section: same note, no trigger");
+
+    section::Section h;   // TRIG patched: sample and hold
+    h.process (0.f, true, true, s);
+    o = h.process (7.f / 12, false, true, s);
+    check (near (o.volts, 0.0), "section: patched TRIG holds between edges");
+    o = h.process (7.f / 12, true, true, s);
+    check (near (o.volts, 7.0 / 12) && o.trig, "section: an edge samples the new note");
+
+    s.passThrough = true;
+    section::Section p;
+    p.process (0.f, false, false, s);
+    o = p.process (9.f / 12, false, false, s);
+    check (! o.trig, "section: pass-through ignores note changes");
+    o = p.process (9.f / 12, true, true, s);
+    check (o.trig, "section: pass-through fires on each TRIG edge");
+}
+
+void testSectionPitch()
+{
+    section::Settings s = majorSettings();
+    section::Section x;
+    s.mask = 0;
+    section::Out o = x.process (0.123f, false, false, s);
+    check (near (o.volts, 0.123) && o.pc == -1, "section: empty mask passes CV through");
+    s.mask = scale::preset (0);
+    s.axis = 12;
+    o = x.process (4.f / 12, false, false, s);
+    check (near (o.volts, 16.0 / 12) && o.pc == 4, "section: AXIS shifts the output, the key light keeps the scale note");
+    s.axis = 0;
+    s.degrees = 2;
+    o = x.process (0.f, false, false, s);
+    check (near (o.volts, 4.0 / 12) && o.pc == 4, "section: INTERVAL +2 degrees from C is E");
+    s.degrees = 0;
+    s.axis = 12;
+    o = x.process (15.f, false, false, s);
+    check (near (o.volts, 10.0), "section: input and output clamp to 10 V");
+}
+
+void testSectionArp()
+{
+    section::Settings s = majorSettings();
+    s.arpMode = true;
+    section::Section a;
+    std::vector<int> got;
+    for (int i = 0; i < 8; ++i) got.push_back (a.process (0.f, true, true, s).pc);
+    check (got == std::vector<int> { 0, 2, 4, 5, 7, 9, 11, 0 }, "section arp: steps up the scale on each edge");
+    section::Out o = a.process (0.f, false, true, s);
+    check (o.pc == 0 && ! o.trig, "section arp: holds between edges, no trigger");
+    o = a.process (0.f, true, true, s);
+    check (o.trig && o.pc == 2, "section arp: TRIG out passes each edge");
+
+    s.degrees = 2;
+    section::Section b;
+    o = b.process (0.f, true, true, s);
+    check (near (o.volts, 4.0 / 12) && o.pc == 4, "section arp: INTERVAL shifts the arp note");
+
+    s.degrees = 0;
+    s.octaves = 2;
+    section::Section r;
+    r.process (0.f, true, true, s);
+    r.process (0.f, true, true, s);
+    r.arpeggiator.reset();
+    o = r.process (0.f, true, true, s);
+    check (o.pc == 0 && near (o.volts, 0.0), "section arp: after reset the next edge plays the first note");
+
+    section::Section m;
+    o = m.process (2.f / 12, true, true, s);
+    check (o.pc == 2 && near (o.volts, 2.0 / 12), "section arp: CV in sets the base note");
+
+    s.mask = 0;
+    section::Section e;
+    o = e.process (0.3f, true, true, s);
+    check (near (o.volts, 0.3) && o.trig, "section arp: empty mask holds the CV on each edge");
+}
 // ---- tests (each task adds its functions above this line)
 }
 
@@ -218,6 +310,9 @@ int main()
     testArpDirections();
     testArpEdges();
     testArpRandom();
+    testSectionQuantizer();
+    testSectionPitch();
+    testSectionArp();
     // ---- calls (each task adds its calls above this line)
     std::printf ("\n%s: %d failure(s)\n", failures ? "FAILED" : "PASSED", failures);
     return failures ? 1 : 0;
