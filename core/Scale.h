@@ -73,4 +73,23 @@ inline int nearest (float semis, uint16_t mask)
 
 // Volts in, quantized volts out. Empty mask: the voltage passes through unchanged.
 inline float quantize (float volts, uint16_t mask) { return mask ? nearest (volts * 12.f, mask) / 12.f : volts; }
+
+// Moves a pitch n scale degrees (n < 0 = down). Each degree is the next in-mask pitch strictly above (below), so it
+// also works from a pitch outside the mask. Empty mask: the pitch is returned unchanged.
+inline int degreeShift (int semi, uint16_t mask, int n)
+{
+    if (! mask) return semi;
+    for (; n > 0; --n) do ++semi; while (! inMask (semi, mask));
+    for (; n < 0; ++n) do --semi; while (! inMask (semi, mask));
+    return semi;
+}
+
+// RANDOM: a coin per note, C always kept.
+inline uint16_t randomMask (Rng& rng)
+{
+    uint16_t m = 1;
+    for (int k = 1; k < 12; ++k)
+        if (rng.next() & 0x80000000u) m |= (uint16_t) (1u << k);
+    return m;
+}
 }

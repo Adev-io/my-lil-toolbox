@@ -81,6 +81,39 @@ void testQuantize()
            "quantize: C in any octave stays put");
     check (scale::nearest (1.1f, scale::preset (0)) == 2, "nearest: C# + 0.1 in major is D");
 }
+void testDegrees()
+{
+    const uint16_t maj = scale::preset (0), mp = scale::preset (8);
+    check (scale::degreeShift (0, maj, 1) == 2 && scale::degreeShift (0, maj, -1) == -1, "degrees: major +-1");
+    check (scale::degreeShift (0, maj, 7) == 12 && scale::degreeShift (0, maj, -7) == -12, "degrees: major +-7 is an octave");
+    check (scale::degreeShift (0, maj, 12) == 21 && scale::degreeShift (0, maj, -12) == -20, "degrees: major +-12");
+    check (scale::degreeShift (0, mp, 1) == 3 && scale::degreeShift (0, mp, -1) == -2, "degrees: minor pentatonic +-1");
+    check (scale::degreeShift (0, mp, 7) == 17 && scale::degreeShift (0, mp, -7) == -17, "degrees: minor pentatonic +-7");
+    check (scale::degreeShift (0, mp, 12) == 29 && scale::degreeShift (0, mp, -12) == -29, "degrees: minor pentatonic +-12");
+    check (scale::degreeShift (1, maj, 1) == 2 && scale::degreeShift (1, maj, -1) == 0, "degrees: from outside the scale");
+    check (scale::degreeShift (5, 0, 3) == 5, "degrees: empty mask leaves the pitch alone");
+    check (scale::degreeShift (7, maj, 0) == 7, "degrees: 0 is identity");
+}
+
+void testRandomMask()
+{
+    scale::Rng rng (777);
+    const uint16_t first = scale::randomMask (rng);
+    bool cAlways = true, noHigh = true, varies = false;
+    int on[12] = {};
+    for (int i = 0; i < 100; ++i)
+    {
+        const uint16_t m = scale::randomMask (rng);
+        cAlways = cAlways && (m & 1u);
+        noHigh = noHigh && ! (m & ~0xFFFu);
+        varies = varies || m != first;
+        for (int k = 0; k < 12; ++k) on[k] += (m >> k) & 1;
+    }
+    bool everyBitBoth = true;
+    for (int k = 1; k < 12; ++k) everyBitBoth = everyBitBoth && on[k] > 0 && on[k] < 100;
+    check (cAlways && noHigh, "random mask: C always in, nothing past B");
+    check (varies && everyBitBoth, "random mask: every other note both on and off over 100 rolls");
+}
 // ---- tests (each task adds its functions above this line)
 }
 
@@ -90,6 +123,8 @@ int main()
     testTypeIndex();
     testRngAndClamp();
     testQuantize();
+    testDegrees();
+    testRandomMask();
     // ---- calls (each task adds its calls above this line)
     std::printf ("\n%s: %d failure(s)\n", failures ? "FAILED" : "PASSED", failures);
     return failures ? 1 : 0;
