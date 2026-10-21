@@ -54,7 +54,12 @@ struct Arp
                 if (goingUp) { if (idx + 1 < size) ++idx; else { goingUp = false; --idx; } }
                 else { if (idx > 0) --idx; else { goingUp = true; ++idx; } }
                 break;
-            default: idx = 0; break;   // RANDOM: Task 6
+            default:   // RANDOM: uniform over every index except the current one
+            {
+                const int r = (int) (rng.next() % (uint32_t) (size - 1));
+                idx = r >= idx ? r + 1 : r;
+                break;
+            }
         }
         return pool[idx];
     }

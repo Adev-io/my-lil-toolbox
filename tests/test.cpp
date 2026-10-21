@@ -175,6 +175,34 @@ void testArpEdges()
     solo.build (3, maskOf ({ 3 }), 1);
     check (run (solo, arp::RANDOM, 3) == std::vector<int> { 3, 3, 3 }, "arp: a pool of 1 repeats, even in random");
 }
+void testArpRandom()
+{
+    arp::Arp a (12345);
+    a.build (0, scale::preset (0), 1);
+    a.step (arp::RANDOM);   // the first step after construction plays the lowest note
+    int prev = a.idx, hits[7] = {};
+    bool repeat = false;
+    for (int i = 0; i < 1000; ++i)
+    {
+        a.step (arp::RANDOM);
+        repeat = repeat || a.idx == prev;
+        prev = a.idx;
+        ++hits[a.idx];
+    }
+    bool all = true;
+    for (int h : hits) all = all && h > 0;
+    check (! repeat, "arp random: never the same note twice in a row (1000 steps)");
+    check (all, "arp random: every pool note gets played");
+    arp::Arp r1 (99), r2 (99);
+    r1.build (0, scale::preset (0), 2);
+    r2.build (0, scale::preset (0), 2);
+    check (run (r1, arp::RANDOM, 50) == run (r2, arp::RANDOM, 50), "arp random: same seed, same notes");
+    arp::Arp f (7);
+    f.build (0, scale::preset (0), 1);
+    run (f, arp::RANDOM, 5);
+    f.reset();
+    check (f.step (arp::RANDOM) == 0, "arp random: reset plays the lowest note next");
+}
 // ---- tests (each task adds its functions above this line)
 }
 
@@ -189,6 +217,7 @@ int main()
     testArpPool();
     testArpDirections();
     testArpEdges();
+    testArpRandom();
     // ---- calls (each task adds its calls above this line)
     std::printf ("\n%s: %d failure(s)\n", failures ? "FAILED" : "PASSED", failures);
     return failures ? 1 : 0;
