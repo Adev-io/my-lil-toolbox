@@ -23,7 +23,8 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # button VCVButton / VCVLightLatch (6.1 mm), light SmallSimpleLight, in = input jack (magenta ring), out = output jack
 RADIUS = {'hero': 8.8, 'knob': 6.7, 'key': 3.6, 'button': 3.1, 'light': 1.0, 'in': 4.0, 'out': 4.0}
 LABEL_SIZE = {'hero': 3.0, 'knob': 2.6, 'button': 2.4, 'light': 2.0, 'in': 2.4, 'out': 2.6}
-PAD_R = 5.0   # dark plate behind an output jack
+PAD_R = 4.8   # dark plate behind an output jack
+RING_R = RADIUS['in'] + 0.7   # magenta ring around an input jack
 
 font = TTFont(FONT)
 glyphs, cmap, upm = font.getGlyphSet(), font.getBestCmap(), font['head'].unitsPerEm
@@ -55,7 +56,8 @@ for col, pc in enumerate(WHITE_PC):
 for col, pc in zip(BLACK_AFTER, BLACK_PC):
     KEYS[pc] = (KX0 + (col + 0.5) * KDX, 19.5)
 
-ROW_TYPE, ROW_MODE, ROW_AXIS, ROW_IN, ROW_OUT = 45.0, 65.0, 83.0, 103.0, 115.5
+ROW_TYPE, ROW_MODE, ROW_AXIS, ROW_IN, ROW_OUT = 45.0, 65.0, 83.0, 102.0, 115.3
+JX = (8.48, 19.48, W / 2, 41.48, 52.48)   # jack-zone columns, 11 mm apart
 LAYOUT = [('KEY%d_PARAM' % pc, 'key', x, y, '') for pc, (x, y) in sorted(KEYS.items())] + [
     ('TYPE_PARAM', 'hero', 15.0, ROW_TYPE, 'TYPE'), ('TYPE_INPUT', 'in', 31.0, ROW_TYPE, 'CV'),
     ('RAND_PARAM', 'button', 43.0, ROW_TYPE, 'RAND'), ('RAND_INPUT', 'in', 54.0, ROW_TYPE, 'TRIG'),
@@ -64,11 +66,11 @@ LAYOUT = [('KEY%d_PARAM' % pc, 'key', x, y, '') for pc, (x, y) in sorted(KEYS.it
     ('OCT_PARAM', 'knob', 52.5, ROW_MODE, 'OCT'),
     ('AXIS_PARAM', 'knob', 11.0, ROW_AXIS, 'AXIS'), ('AXIS_INPUT', 'in', 24.0, ROW_AXIS, 'CV'),
     ('INT_PARAM', 'knob', 37.0, ROW_AXIS, 'INTERVAL'), ('INT_INPUT', 'in', 50.0, ROW_AXIS, 'CV'),
-    ('A_CV_INPUT', 'in', 8.0, ROW_IN, 'CV'), ('A_TRIG_INPUT', 'in', 19.5, ROW_IN, 'TRIG'),
-    ('RESET_INPUT', 'in', W / 2, ROW_IN, 'RESET'),
-    ('B_CV_INPUT', 'in', 41.5, ROW_IN, 'CV'), ('B_TRIG_INPUT', 'in', 53.0, ROW_IN, 'TRIG'),
-    ('A_CV_OUTPUT', 'out', 8.0, ROW_OUT, 'CV'), ('A_TRIG_OUTPUT', 'out', 19.5, ROW_OUT, 'TRIG'),
-    ('B_CV_OUTPUT', 'out', 41.5, ROW_OUT, 'CV'), ('B_TRIG_OUTPUT', 'out', 53.0, ROW_OUT, 'TRIG'),
+    ('A_CV_INPUT', 'in', JX[0], ROW_IN, 'CV'), ('A_TRIG_INPUT', 'in', JX[1], ROW_IN, 'TRIG'),
+    ('RESET_INPUT', 'in', JX[2], ROW_IN, 'RESET'),
+    ('B_CV_INPUT', 'in', JX[3], ROW_IN, 'CV'), ('B_TRIG_INPUT', 'in', JX[4], ROW_IN, 'TRIG'),
+    ('A_CV_OUTPUT', 'out', JX[0], ROW_OUT, 'CV'), ('A_TRIG_OUTPUT', 'out', JX[1], ROW_OUT, 'TRIG'),
+    ('B_CV_OUTPUT', 'out', JX[3], ROW_OUT, 'CV'), ('B_TRIG_OUTPUT', 'out', JX[4], ROW_OUT, 'TRIG'),
 ]
 
 
@@ -81,16 +83,16 @@ def panel():
         text('ARPEGGIO', W / 2, 6.3, 4.3, INK, stroke=0.39),
         text('my lil toolbox', W / 2, 12.6, 2.4, WHITE, stroke=0.12),
         '<rect x="2.5" y="14.6" width="%g" height="18.4" rx="1.5" fill="none" stroke="%s" stroke-width="0.5"/>' % (W - 5, LIME),
-        '<rect x="3.5" y="94.5" width="%g" height="29" rx="2" fill="%s"/>' % (W - 7, INK2),   # jack zone
-        text('A', 13.75, 98.4, 2.8, LIME, stroke=0.2), text('B', 47.25, 98.4, 2.8, LIME, stroke=0.2),
+        '<rect x="2.5" y="94.5" width="%g" height="29.2" rx="2" fill="%s"/>' % (W - 5, INK2),   # jack zone
+        text('A', (JX[0] + JX[1]) / 2, 98.4, 2.8, LIME, stroke=0.2), text('B', (JX[3] + JX[4]) / 2, 98.4, 2.8, LIME, stroke=0.2),
     ]
     rowmax = {}   # labels in a row share one baseline, set by the row's biggest part
     for _, kind, x, y, _ in LAYOUT:
         if kind not in ('out', 'light', 'key'):
-            rowmax[y] = max(rowmax.get(y, 0), RADIUS[kind])
+            rowmax[y] = max(rowmax.get(y, 0), RING_R if kind == 'in' else RADIUS[kind])
     for _, kind, x, y, label in LAYOUT:
         if kind == 'in':
-            out.append('<circle cx="%g" cy="%g" r="%g" fill="none" stroke="%s" stroke-width="0.6"/>' % (x, y, RADIUS[kind] + 1.3, MAGENTA))
+            out.append('<circle cx="%g" cy="%g" r="%g" fill="none" stroke="%s" stroke-width="0.5"/>' % (x, y, RING_R, MAGENTA))
         elif kind == 'out':
             out.append('<circle cx="%g" cy="%g" r="%g" fill="%s" stroke="%s" stroke-width="0.5"/>' % (x, y, PAD_R, INK, LIME))
         if not label:
@@ -100,7 +102,7 @@ def panel():
             continue
         reach = PAD_R if kind == 'out' else rowmax[y]
         colour, stroke = (LIME, 0.3) if kind == 'hero' else (LIME, 0.25) if kind == 'out' else (WHITE, 0.18)
-        out.append(text(label, x, y + reach + 2.8, LABEL_SIZE[kind], colour, stroke=stroke))
+        out.append(text(label, x, y + reach + 2.8 + (0.4 if kind == 'hero' else 0), LABEL_SIZE[kind], colour, stroke=stroke))
     out.append(text('A_DEVELOPMENT', W / 2, 126.4, 2.4, DIM))
     out.append('</svg>')
     return '\n'.join(out) + '\n'

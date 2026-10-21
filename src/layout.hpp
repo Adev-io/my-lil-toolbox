@@ -29,14 +29,14 @@ constexpr float AXIS_PARAM[2] = {11.00f, 83.00f};
 constexpr float AXIS_INPUT[2] = {24.00f, 83.00f};
 constexpr float INT_PARAM[2] = {37.00f, 83.00f};
 constexpr float INT_INPUT[2] = {50.00f, 83.00f};
-constexpr float A_CV_INPUT[2] = {8.00f, 103.00f};
-constexpr float A_TRIG_INPUT[2] = {19.50f, 103.00f};
-constexpr float RESET_INPUT[2] = {30.48f, 103.00f};
-constexpr float B_CV_INPUT[2] = {41.50f, 103.00f};
-constexpr float B_TRIG_INPUT[2] = {53.00f, 103.00f};
-constexpr float A_CV_OUTPUT[2] = {8.00f, 115.50f};
-constexpr float A_TRIG_OUTPUT[2] = {19.50f, 115.50f};
-constexpr float B_CV_OUTPUT[2] = {41.50f, 115.50f};
-constexpr float B_TRIG_OUTPUT[2] = {53.00f, 115.50f};
+constexpr float A_CV_INPUT[2] = {8.48f, 102.00f};
+constexpr float A_TRIG_INPUT[2] = {19.48f, 102.00f};
+constexpr float RESET_INPUT[2] = {30.48f, 102.00f};
+constexpr float B_CV_INPUT[2] = {41.48f, 102.00f};
+constexpr float B_TRIG_INPUT[2] = {52.48f, 102.00f};
+constexpr float A_CV_OUTPUT[2] = {8.48f, 115.30f};
+constexpr float A_TRIG_OUTPUT[2] = {19.48f, 115.30f};
+constexpr float B_CV_OUTPUT[2] = {41.48f, 115.30f};
+constexpr float B_TRIG_OUTPUT[2] = {52.48f, 115.30f};
 }
 }
