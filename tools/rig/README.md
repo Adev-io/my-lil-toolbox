@@ -12,3 +12,4 @@ click.ps1 moves the real cursor for ~0.4 s: don't run it while someone is using 
 a full-window cap.ps1 shot, not a crop. Never trigger a native dialog: it blocks the window and the scripts cannot close it.
 `patches/smoke.vcv`: Fundamental LFO square into A TRIG, Arpeggio in arp mode (OCT 2, INTERVAL +2), A and B CV out into
 Fundamental Scope X and Y.
+Close any other running Rack first: while another Rack.exe is up, the rig's Rack exits within seconds of launch.
