@@ -84,15 +84,16 @@ def arpeggio_extras():
     ]
 
 
-# ---- Ripple: tempo row, transport row, four generator columns (PERIOD, ON, CV, out), then the mix outputs
-GX = (8.73, 23.23, 37.73, 52.23)   # generator columns A-D, 14.5 mm apart
+# ---- Ripple: tempo row (CV and EXT jacks sit lower, on a label row of their own), transport pairs PLAY+TRIG and
+# RESET+TRIG with MODE alone, four generator columns (PERIOD, ON, CV, out), then the mix outputs
+GX = (8.73, 23.23, 37.73, 52.23)   # generator columns A-D, 14.5 mm apart; DENSITY and MODE share column D
 RIPPLE = [
     ('TEMPO_PARAM', 'hero', 12.0, 25.0, 'TEMPO'), ('TEMPO_LIGHT', 'light', 22.5, 17.5, ''),
-    ('TEMPO_INPUT', 'in', 27.0, 25.0, 'CV'), ('EXT_INPUT', 'in', 38.5, 25.0, 'EXT'),
-    ('DENSITY_PARAM', 'knob', 51.5, 25.0, 'DENSITY'),
-    ('PLAY_PARAM', 'button', JX[0], 44.0, 'PLAY'), ('PLAY_INPUT', 'in', JX[1], 44.0, 'TRIG'),
-    ('RESET_PARAM', 'button', JX[2], 44.0, 'RESET'), ('RESET_INPUT', 'in', JX[3], 44.0, 'TRIG'),
-    ('MODE_PARAM', 'button', JX[4], 44.0, 'MODE'),
+    ('TEMPO_INPUT', 'in', 27.0, 29.5, 'CV'), ('EXT_INPUT', 'in', 38.5, 29.5, 'EXT'),
+    ('DENSITY_PARAM', 'knob', GX[3], 25.0, 'DENSITY'),
+    ('PLAY_PARAM', 'button', GX[0], 45.0, 'PLAY'), ('PLAY_INPUT', 'in', 17.8, 45.0, 'TRIG'),
+    ('RESET_PARAM', 'button', 29.5, 45.0, 'RESET'), ('RESET_INPUT', 'in', 38.5, 45.0, 'TRIG'),
+    ('MODE_PARAM', 'button', GX[3], 45.0, 'MODE'),
 ] + [part for i, (x, name) in enumerate(zip(GX, 'ABCD')) for part in (
     ('PERIOD%d_PARAM' % i, 'knob', x, 62.5, name), ('ON%d_PARAM' % i, 'button', x, 77.0, ''),
     ('PERIOD%d_INPUT' % i, 'in', x, 87.5, ''), ('GEN%d_OUTPUT' % i, 'out', x, 101.0, name))] + [
@@ -102,7 +103,7 @@ RIPPLE = [
 
 
 def ripple_extras():
-    return ['<rect x="2.5" y="94" width="%g" height="30" rx="2" fill="%s"/>' % (W - 5, INK2)]   # jack zone
+    return ['<rect x="2.5" y="94.5" width="%g" height="29.2" rx="2" fill="%s"/>' % (W - 5, INK2)]   # jack zone
 
 
 MODULES = {'Arpeggio': ('ARPEGGIO', ARPEGGIO, arpeggio_extras), 'Ripple': ('RIPPLE', RIPPLE, ripple_extras)}
