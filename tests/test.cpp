@@ -3,6 +3,7 @@
 #include "Scale.h"
 #include "Arp.h"
 #include "Section.h"
+#include "Rhythm.h"
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
@@ -297,6 +298,73 @@ void testSectionArp()
     o = e.process (0.3f, true, true, s);
     check (near (o.volts, 0.3) && o.trig, "section arp: empty mask holds the CV on each edge");
 }
+// R (or R') of the grid engine over ticks 0..n-1: 'x' = fires, '.' = silent
+std::string gridPattern (const int period[4], unsigned on, int density, bool wantR, int n)
+{
+    std::string s;
+    for (int t = 0; t < n; ++t)
+    {
+        const rhythm::Tick k = rhythm::grid ((uint32_t) t, period, on, density);
+        s += (wantR ? k.r : k.rp) ? 'x' : '.';
+    }
+    return s;
+}
+
+void testRhythmCycle()
+{
+    bool divides = true;
+    for (uint32_t p = 1; p <= 16; ++p) divides = divides && rhythm::wrap % p == 0;
+    check (divides, "rhythm: every period 1..16 divides the wrap");
+    check (rhythm::clampPeriod (0) == 1 && rhythm::clampPeriod (17) == 16 && rhythm::clampPeriod (7) == 7, "rhythm: clampPeriod");
+    check (rhythm::lcm (4, 6) == 12, "rhythm: lcm (4, 6)", rhythm::lcm (4, 6));
+    const int p345[4] = { 3, 4, 5, 2 };
+    check (rhythm::cycle (p345, 0x7u) == 60, "cycle {3,4,5} = 60", rhythm::cycle (p345, 0x7u));
+    const int p24[4] = { 2, 4, 1, 1 };
+    check (rhythm::cycle (p24, 0x3u) == 4, "cycle {2,4} = 4", rhythm::cycle (p24, 0x3u));
+    const int big[4] = { 16, 15, 13, 11 };
+    check (rhythm::cycle (big, 0xFu) == 34320, "cycle {16,15,13,11} = 34320", rhythm::cycle (big, 0xFu));
+    check (rhythm::cycle (big, 0u) == 0, "cycle: nothing on = 0");
+}
+
+void testRhythmGrid()
+{
+    const int p[4] = { 2, 3, 4, 5 };   // A=2, B=3, C=4 on (0x7); D=5 off
+    check (gridPattern (p, 0x7u, 1, true, 12) == "x.xxx.x.xxx.", "grid density 1: R is any hit");
+    check (gridPattern (p, 0x7u, 1, false, 12) == ".x...x.x...x", "grid density 1: R' fills the gaps");
+    check (gridPattern (p, 0x7u, 2, true, 12) == "x...x.x.x...", "grid density 2: R");
+    check (gridPattern (p, 0x7u, 2, false, 12) == ".xxx.x.x.xxx", "grid density 2: R' is every other tick");
+    check (gridPattern (p, 0x7u, 3, true, 12) == "x...........", "grid density 3: R");
+    check (gridPattern (p, 0x7u, 4, true, 12) == "............", "grid density 4 above the active count: R never");
+    check (gridPattern (p, 0x7u, 0, true, 2) == "x.", "grid: density below 1 acts as 1");
+    check (rhythm::grid (6, p, 0x7u, 1).gens == 0x3u, "grid: tick 6 fires A and B", rhythm::grid (6, p, 0x7u, 1).gens);
+    check (rhythm::grid (0, p, 0xFu, 1).gens == 0xFu, "grid: the downbeat fires every on generator");
+    check (gridPattern (p, 0u, 1, true, 8) == "........" && gridPattern (p, 0u, 1, false, 8) == "xxxxxxxx",
+           "grid: all off, R silent and R' every tick");
+    const int one[4] = { 1, 9, 9, 9 };
+    check (gridPattern (one, 0x1u, 1, true, 5) == "xxxxx", "grid: period 1 fires every tick");
+    bool accentOk = true;
+    for (uint32_t t = 0; t <= 36; ++t) accentOk = accentOk && rhythm::grid (t, p, 0x7u, 1).accent == (t % 12 == 0);
+    check (accentOk, "grid: ACCENT every 12 ticks for {2,3,4}");
+    bool silent = true;
+    for (uint32_t t = 0; t <= 12; ++t) silent = silent && ! rhythm::grid (t, p, 0u, 1).accent;
+    check (silent, "grid: ACCENT silent with nothing on");
+}
+
+void testRhythmCounter()
+{
+    rhythm::Counter c;
+    check (c.armed && c.next() == 0 && c.next() == 1 && c.next() == 2, "counter: starts armed at the downbeat");
+    c.reset();
+    check (c.next() == 0, "counter: reset arms tick 0");
+    c.t = rhythm::wrap - 1;
+    check (c.next() == 0, "counter: wraps 720719 -> 0");
+    c.t = 1;
+    check (c.nextBeat() == 4 && c.nextBeat() == 8, "counter: nextBeat jumps to the next multiple of 4");
+    c.reset();
+    check (c.nextBeat() == 0, "counter: nextBeat after reset plays tick 0");
+    c.t = rhythm::wrap - 3;
+    check (c.nextBeat() == 0, "counter: nextBeat wraps");
+}
 // ---- tests (each task adds its functions above this line)
 }
 
@@ -315,6 +383,9 @@ int main()
     testSectionQuantizer();
     testSectionPitch();
     testSectionArp();
+    testRhythmCycle();
+    testRhythmGrid();
+    testRhythmCounter();
     // ---- calls (each task adds its calls above this line)
     std::printf ("\n%s: %d failure(s)\n", failures ? "FAILED" : "PASSED", failures);
     return failures ? 1 : 0;
