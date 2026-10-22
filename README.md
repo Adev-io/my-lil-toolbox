@@ -26,6 +26,22 @@ AXIS transposes both outputs by -12..+12 semitones (CV: 1 V/oct) (knob + CV, -12
 
 **Lights.** Dim keys are in the scale; green is A's note, blue is B's (cyan when both), shown before AXIS. The DIR lights show U, D, UD or RND.
 
+## Ripple
+
+Polyrhythm trigger generator. Four generators tick on a 16th-note grid, each every PERIOD sixteenths, and mix into two
+complementary rhythms, R and R'.
+
+- **TEMPO** 30-300 BPM; the CV input is exponential (+1 V doubles). Patch **EXT** to clock it from outside: one pulse
+  per 16th, or per beat (context menu).
+- **PLAY** and **RESET** buttons, each with a trigger input. RESET returns to the downbeat, where every generator lines up.
+- **A-D**: PERIOD knob (1-16 sixteenths; CV adds 1 per volt), ON button, and a trigger output that fires every PERIOD
+  ticks.
+- **MODE** (green = GRID, amber = WAVE) and **DENSITY** (1-4):
+  - GRID: R fires on ticks where at least DENSITY generators hit; R' fires on every other tick.
+  - WAVE: each generator is a sine with its period; R fires when their average rises past a threshold set by DENSITY,
+    R' when it falls past the negative threshold. Looser and off-grid.
+- **CLOCK** fires every 16th (or every beat, context menu). **ACCENT** fires once per full cycle of the active periods.
+
 ## Build
 
 MSYS2 mingw64 with the Rack SDK: `export RACK_DIR=/c/dev/Rack-SDK`, then `make test` (core checks), `make`,

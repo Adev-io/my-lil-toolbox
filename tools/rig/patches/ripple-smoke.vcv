@@ -1,0 +1,6 @@
+{"version":"2.6.6","modules":[
+{"id":1,"plugin":"MyLilToolbox","model":"Ripple","version":"2.1.0","params":[],"pos":[0,0]},
+{"id":2,"plugin":"Fundamental","model":"Scope","version":"2.6.4","params":[],"pos":[13,0]}],
+"cables":[
+{"id":1,"outputModuleId":1,"outputId":5,"inputModuleId":2,"inputId":0,"color":"#f3374b"},
+{"id":2,"outputModuleId":1,"outputId":6,"inputModuleId":2,"inputId":1,"color":"#00b56e"}]}
