@@ -107,8 +107,11 @@ struct Ripple : Module
         if (inputs[EXT_INPUT].isConnected())
         {
             const bool edge = extTrig.process (inputs[EXT_INPUT].getVoltage(), 0.1f, 1.f);
-            sinceTick += dt;
-            sincePulse += dt;
+            if (play)
+            {
+                sinceTick += dt;
+                sincePulse += dt;
+            }
             if (edge && play)
             {
                 if (pulses < 2) ++pulses;
@@ -127,6 +130,7 @@ struct Ripple : Module
         }
         else
         {
+            pulses = 0;   // EXT unpatched: the next patch re-measures its interval from two fresh pulses
             if (play)
             {
                 if (counter.armed)   // power-on or RESET: the downbeat plays at once
