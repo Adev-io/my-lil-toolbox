@@ -64,7 +64,6 @@ struct Ripple : Module
         cross.reset();
         phase = sinceTick = 0.0;
         pending = 0;
-        skipMeasure = false;
     }
 
     // One tick of the grid: generator, CLOCK, ACCENT and tempo-light pulses; R and R' too in GRID mode.
@@ -204,6 +203,7 @@ struct Ripple : Module
         play = true;
         extPerBeat = clockBeats = false;
         restart();
+        if (pulses == 2) skipMeasure = true; else pulses = 0;   // Initialize resumes play: same rule as pressing PLAY
     }
 
     json_t* dataToJson() override
