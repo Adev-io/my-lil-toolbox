@@ -370,7 +370,7 @@ void testRhythmCounter()
 void waveCrossings (const int period[4], unsigned on, int density, double ticks, std::vector<double>& rAt, std::vector<double>& rpAt)
 {
     rhythm::Crossing c;
-    const float th = (density - 1) / 4.f;
+    const float th = rhythm::threshold (density);
     for (int i = 0; i < (int) (ticks * 64); ++i)
     {
         const double T = i / 64.0;
@@ -389,6 +389,8 @@ void testRhythmWave()
     check (near (rhythm::waveSum (0.5, p, 0x3u), (std::sin (rhythm::twoPi * 0.5 / 4) + std::sin (rhythm::twoPi * 0.5 / 3)) / 2),
            "wave: the sum is the mean of the on sines", rhythm::waveSum (0.5, p, 0x3u));
     check (rhythm::waveSum (1.3, p, 0u) == 0.f, "wave: nothing on, sum 0");
+    check (rhythm::threshold (1) == 0.f && rhythm::threshold (4) == 0.75f && rhythm::threshold (0) == 0.f && rhythm::threshold (9) == 0.75f,
+           "wave: threshold per density, clamped");
 
     std::vector<double> r, rp;
     waveCrossings (p, 0x1u, 1, 8.0, r, rp);

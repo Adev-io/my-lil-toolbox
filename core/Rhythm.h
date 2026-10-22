@@ -106,6 +106,9 @@ inline float waveSum (double T, const int period[numGens], unsigned onMask)
     return n ? (float) (s / n) : 0.f;
 }
 
+// WAVE threshold for DENSITY 1..4 (clamped): 0, 0.25, 0.5, 0.75
+inline float threshold (int density) { return ((density < 1 ? 1 : density > numGens ? numGens : density) - 1) / 4.f; }
+
 // Threshold crossings of the wave sum: R when it rises through +th, R' when it falls through -th.
 // At th = 0 an S sitting exactly at 0 fires R once (from the reset seed) and nothing after; a touch to 0 and back
 // fires at most one side. That is intended.
