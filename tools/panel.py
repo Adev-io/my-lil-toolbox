@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""panel.py: writes res/Arpeggio.svg and src/layout.hpp from one layout table.
+"""panel.py: writes res/<Module>.svg for each module and src/layout.hpp, from one layout table per module.
 
 Labels become paths (DejaVu Sans from the Rack install, or the font named by RACK_FONT), so the SVG has no <text>,
-as the VCV panel guide asks. The widget reads the same table through layout.hpp, so art and components cannot drift.
+as the VCV panel guide asks. The widgets read the same tables through layout.hpp, so art and components cannot drift.
 Run from anywhere: py -3.11 tools/panel.py   (needs fontTools).
 Author: Ari Klopfer / A_Development. MIT
 """
+import math
 import os
 from fontTools.ttLib import TTFont
 from fontTools.pens.svgPathPen import SVGPathPen
@@ -46,6 +47,7 @@ def text(s, x, y, size, fill, anchor='middle', stroke=0.0):
     return '<path fill="%s"%s d="%s"/>' % (fill, bold, ' '.join(d))
 
 
+# ---- Arpeggio
 # Keyboard: white keys on the lower row, black keys above, between their neighbours. Key id = pitch class.
 KX0, KDX = 7.08, 7.8
 WHITE_PC, BLACK_PC = (0, 2, 4, 5, 7, 9, 11), (1, 3, 6, 8, 10)
@@ -58,7 +60,7 @@ for col, pc in zip(BLACK_AFTER, BLACK_PC):
 
 ROW_TYPE, ROW_MODE, ROW_AXIS, ROW_IN, ROW_OUT = 45.0, 65.0, 83.0, 102.0, 115.3
 JX = (8.48, 19.48, W / 2, 41.48, 52.48)   # jack-zone columns, 11 mm apart
-LAYOUT = [('KEY%d_PARAM' % pc, 'key', x, y, '') for pc, (x, y) in sorted(KEYS.items())] + [
+ARPEGGIO = [('KEY%d_PARAM' % pc, 'key', x, y, '') for pc, (x, y) in sorted(KEYS.items())] + [
     ('TYPE_PARAM', 'hero', 15.0, ROW_TYPE, 'TYPE'), ('TYPE_INPUT', 'in', 31.0, ROW_TYPE, 'CV'),
     ('RAND_PARAM', 'button', 43.0, ROW_TYPE, 'RAND'), ('RAND_INPUT', 'in', 54.0, ROW_TYPE, 'TRIG'),
     ('MODE_PARAM', 'button', 8.0, ROW_MODE, 'MODE'), ('DIR_PARAM', 'button', 19.0, ROW_MODE, 'DIR'),
@@ -74,23 +76,62 @@ LAYOUT = [('KEY%d_PARAM' % pc, 'key', x, y, '') for pc, (x, y) in sorted(KEYS.it
 ]
 
 
-def panel():
+def arpeggio_extras():
+    return [
+        '<rect x="2.5" y="14.6" width="%g" height="18.4" rx="1.5" fill="none" stroke="%s" stroke-width="0.5"/>' % (W - 5, LIME),
+        '<rect x="2.5" y="94.5" width="%g" height="29.2" rx="2" fill="%s"/>' % (W - 5, INK2),   # jack zone
+        text('A', (JX[0] + JX[1]) / 2, 98.4, 2.8, LIME, stroke=0.2), text('B', (JX[3] + JX[4]) / 2, 98.4, 2.8, LIME, stroke=0.2),
+    ]
+
+
+# ---- Ripple: tempo row, transport row, four generator columns (PERIOD, ON, CV, out), then the mix outputs
+GX = (8.73, 23.23, 37.73, 52.23)   # generator columns A-D, 14.5 mm apart
+RIPPLE = [
+    ('TEMPO_PARAM', 'hero', 12.0, 25.0, 'TEMPO'), ('TEMPO_LIGHT', 'light', 22.5, 17.5, ''),
+    ('TEMPO_INPUT', 'in', 27.0, 25.0, 'CV'), ('EXT_INPUT', 'in', 38.5, 25.0, 'EXT'),
+    ('DENSITY_PARAM', 'knob', 51.5, 25.0, 'DENSITY'),
+    ('PLAY_PARAM', 'button', JX[0], 44.0, 'PLAY'), ('PLAY_INPUT', 'in', JX[1], 44.0, 'TRIG'),
+    ('RESET_PARAM', 'button', JX[2], 44.0, 'RESET'), ('RESET_INPUT', 'in', JX[3], 44.0, 'TRIG'),
+    ('MODE_PARAM', 'button', JX[4], 44.0, 'MODE'),
+] + [part for i, (x, name) in enumerate(zip(GX, 'ABCD')) for part in (
+    ('PERIOD%d_PARAM' % i, 'knob', x, 62.5, name), ('ON%d_PARAM' % i, 'button', x, 77.0, ''),
+    ('PERIOD%d_INPUT' % i, 'in', x, 87.5, ''), ('GEN%d_OUTPUT' % i, 'out', x, 101.0, name))] + [
+    ('CLOCK_OUTPUT', 'out', GX[0], 115.3, 'CLOCK'), ('R_OUTPUT', 'out', GX[1], 115.3, 'R'),
+    ('RP_OUTPUT', 'out', GX[2], 115.3, "R'"), ('ACCENT_OUTPUT', 'out', GX[3], 115.3, 'ACCENT'),
+]
+
+
+def ripple_extras():
+    return ['<rect x="2.5" y="94" width="%g" height="30" rx="2" fill="%s"/>' % (W - 5, INK2)]   # jack zone
+
+
+MODULES = {'Arpeggio': ('ARPEGGIO', ARPEGGIO, arpeggio_extras), 'Ripple': ('RIPPLE', RIPPLE, ripple_extras)}
+
+
+def reach(kind):
+    return RING_R if kind == 'in' else PAD_R if kind == 'out' else RADIUS[kind]
+
+
+def overlaps(layout):
+    """Pairs of parts whose outlines (input rings and output plates included) touch. Must be empty."""
+    return [(a[0], b[0]) for j, a in enumerate(layout) for b in layout[j + 1:]
+            if math.hypot(a[2] - b[2], a[3] - b[3]) < reach(a[1]) + reach(b[1])]
+
+
+def panel(title, layout, extras):
     out = [
         '<?xml version="1.0" encoding="UTF-8"?>',
         '<svg xmlns="http://www.w3.org/2000/svg" width="%gmm" height="%gmm" viewBox="0 0 %g %g">' % (W, H, W, H),
         '<rect width="%g" height="%g" fill="%s"/>' % (W, H, INK),
         '<rect width="%g" height="%g" fill="%s"/>' % (W, BAND, LIME),
-        text('ARPEGGIO', W / 2, 6.3, 4.3, INK, stroke=0.39),
+        text(title, W / 2, 6.3, 4.3, INK, stroke=0.39),
         text('my lil toolbox', W / 2, 12.6, 2.4, WHITE, stroke=0.12),
-        '<rect x="2.5" y="14.6" width="%g" height="18.4" rx="1.5" fill="none" stroke="%s" stroke-width="0.5"/>' % (W - 5, LIME),
-        '<rect x="2.5" y="94.5" width="%g" height="29.2" rx="2" fill="%s"/>' % (W - 5, INK2),   # jack zone
-        text('A', (JX[0] + JX[1]) / 2, 98.4, 2.8, LIME, stroke=0.2), text('B', (JX[3] + JX[4]) / 2, 98.4, 2.8, LIME, stroke=0.2),
-    ]
+    ] + extras()
     rowmax = {}   # labels in a row share one baseline, set by the row's biggest part
-    for _, kind, x, y, _ in LAYOUT:
+    for _, kind, x, y, _ in layout:
         if kind not in ('out', 'light', 'key'):
             rowmax[y] = max(rowmax.get(y, 0), RING_R if kind == 'in' else RADIUS[kind])
-    for _, kind, x, y, label in LAYOUT:
+    for _, kind, x, y, label in layout:
         if kind == 'in':
             out.append('<circle cx="%g" cy="%g" r="%g" fill="none" stroke="%s" stroke-width="0.5"/>' % (x, y, RING_R, MAGENTA))
         elif kind == 'out':
@@ -100,9 +141,9 @@ def panel():
         if kind == 'light':
             out.append(text(label, x, y + RADIUS['light'] + 2.6, LABEL_SIZE[kind], DIM))
             continue
-        reach = PAD_R if kind == 'out' else rowmax[y]
+        r = PAD_R if kind == 'out' else rowmax[y]
         colour, stroke = (LIME, 0.3) if kind == 'hero' else (LIME, 0.25) if kind == 'out' else (WHITE, 0.18)
-        out.append(text(label, x, y + reach + 2.8 + (0.4 if kind == 'hero' else 0), LABEL_SIZE[kind], colour, stroke=stroke))
+        out.append(text(label, x, y + r + 2.8 + (0.4 if kind == 'hero' else 0), LABEL_SIZE[kind], colour, stroke=stroke))
     out.append(text('A_DEVELOPMENT', W / 2, 126.4, 2.4, DIM))
     out.append('</svg>')
     return '\n'.join(out) + '\n'
@@ -110,15 +151,22 @@ def panel():
 
 def header():
     lines = ['// layout.hpp: generated by tools/panel.py, do not edit. Component centres in mm.', '#pragma once',
-             'namespace layout {', 'namespace arpeggio {']
-    lines += ['constexpr float %s[2] = {%.2ff, %.2ff};' % (i, x, y) for i, _, x, y, _ in LAYOUT]
-    lines += ['}', '}', '']
+             'namespace layout {']
+    for name, (_, layout, _) in MODULES.items():
+        lines += ['namespace %s {' % name.lower()]
+        lines += ['constexpr float %s[2] = {%.2ff, %.2ff};' % (i, x, y) for i, _, x, y, _ in layout]
+        lines += ['}']
+    lines += ['}', '']
     return '\n'.join(lines)
 
 
 if __name__ == '__main__':
-    files = {os.path.join('res', 'Arpeggio.svg'): panel(), os.path.join('src', 'layout.hpp'): header()}
+    for name, (_, layout, _) in MODULES.items():
+        bad = overlaps(layout)
+        assert not bad, '%s: overlapping parts %s' % (name, bad)
+    files = {os.path.join('res', name + '.svg'): panel(*spec) for name, spec in MODULES.items()}
+    files[os.path.join('src', 'layout.hpp')] = header()
     for rel, body in files.items():
         with open(os.path.join(ROOT, rel), 'w', encoding='utf-8') as f:
             f.write(body)
-    print('wrote', ', '.join(files), '(%d components)' % len(LAYOUT))
+    print('wrote', ', '.join(files), '(%s components)' % ', '.join('%s %d' % (n, len(s[1])) for n, s in MODULES.items()))

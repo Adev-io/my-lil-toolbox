@@ -39,4 +39,36 @@ constexpr float A_TRIG_OUTPUT[2] = {19.48f, 115.30f};
 constexpr float B_CV_OUTPUT[2] = {41.48f, 115.30f};
 constexpr float B_TRIG_OUTPUT[2] = {52.48f, 115.30f};
 }
+namespace ripple {
+constexpr float TEMPO_PARAM[2] = {12.00f, 25.00f};
+constexpr float TEMPO_LIGHT[2] = {22.50f, 17.50f};
+constexpr float TEMPO_INPUT[2] = {27.00f, 25.00f};
+constexpr float EXT_INPUT[2] = {38.50f, 25.00f};
+constexpr float DENSITY_PARAM[2] = {51.50f, 25.00f};
+constexpr float PLAY_PARAM[2] = {8.48f, 44.00f};
+constexpr float PLAY_INPUT[2] = {19.48f, 44.00f};
+constexpr float RESET_PARAM[2] = {30.48f, 44.00f};
+constexpr float RESET_INPUT[2] = {41.48f, 44.00f};
+constexpr float MODE_PARAM[2] = {52.48f, 44.00f};
+constexpr float PERIOD0_PARAM[2] = {8.73f, 62.50f};
+constexpr float ON0_PARAM[2] = {8.73f, 77.00f};
+constexpr float PERIOD0_INPUT[2] = {8.73f, 87.50f};
+constexpr float GEN0_OUTPUT[2] = {8.73f, 101.00f};
+constexpr float PERIOD1_PARAM[2] = {23.23f, 62.50f};
+constexpr float ON1_PARAM[2] = {23.23f, 77.00f};
+constexpr float PERIOD1_INPUT[2] = {23.23f, 87.50f};
+constexpr float GEN1_OUTPUT[2] = {23.23f, 101.00f};
+constexpr float PERIOD2_PARAM[2] = {37.73f, 62.50f};
+constexpr float ON2_PARAM[2] = {37.73f, 77.00f};
+constexpr float PERIOD2_INPUT[2] = {37.73f, 87.50f};
+constexpr float GEN2_OUTPUT[2] = {37.73f, 101.00f};
+constexpr float PERIOD3_PARAM[2] = {52.23f, 62.50f};
+constexpr float ON3_PARAM[2] = {52.23f, 77.00f};
+constexpr float PERIOD3_INPUT[2] = {52.23f, 87.50f};
+constexpr float GEN3_OUTPUT[2] = {52.23f, 101.00f};
+constexpr float CLOCK_OUTPUT[2] = {8.73f, 115.30f};
+constexpr float R_OUTPUT[2] = {23.23f, 115.30f};
+constexpr float RP_OUTPUT[2] = {37.73f, 115.30f};
+constexpr float ACCENT_OUTPUT[2] = {52.23f, 115.30f};
+}
 }
