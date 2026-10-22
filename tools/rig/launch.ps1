@@ -1,5 +1,5 @@
 # Starts an isolated VCV Rack: a fresh user dir under %TEMP% holding only the dist build of this plugin (plus any
-# extra plugins named, copied from Ari's Rack), with tips turned off. Ari's own Rack data is never touched.
+# extra plugins named, copied from the user's Rack), with tips turned off. The user's own Rack data is never touched.
 # Usage: pwsh -File tools/rig/launch.ps1 -Patch tools/rig/patches/one-module.vcv [-Extra Fundamental]
 param([Parameter(Mandatory)][string]$Patch, [string[]]$Extra = @())
 $ErrorActionPreference = 'Stop'
@@ -7,7 +7,7 @@ $repo = Split-Path (Split-Path $PSScriptRoot)
 $dist = Join-Path $repo 'dist\MyLilToolbox'
 if (-not (Test-Path "$dist\plugin.dll")) { throw "No build at $dist. Run make dist first." }
 $patchPath = (Resolve-Path $Patch).Path
-foreach ($x in $Extra) { if (-not (Test-Path "$env:LOCALAPPDATA\Rack2\plugins-win-x64\$x")) { throw "No plugin $x in Ari's Rack" } }
+foreach ($x in $Extra) { if (-not (Test-Path "$env:LOCALAPPDATA\Rack2\plugins-win-x64\$x")) { throw "No plugin $x in the user's Rack" } }
 $u = Join-Path $env:TEMP ("toolbox-rig-" + (Get-Date -Format 'yyyyMMdd-HHmmss'))
 New-Item -ItemType Directory "$u\plugins-win-x64" | Out-Null
 Copy-Item $dist "$u\plugins-win-x64\" -Recurse

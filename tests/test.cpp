@@ -257,6 +257,8 @@ void testSectionPitch()
     s.axis = 12;
     o = x.process (15.f, false, false, s);
     check (near (o.volts, 10.0), "section: input and output clamp to 10 V");
+    o = x.process (-15.f, false, false, s);   // s.axis is still 12: -10 V clamped in, +1 octave = -9 V
+    check (near (o.volts, -9.0), "section: input clamps before the math", o.volts);
 }
 
 void testSectionArp()

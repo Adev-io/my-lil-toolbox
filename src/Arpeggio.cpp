@@ -66,7 +66,7 @@ struct Arpeggio : Module
         if (typeSettle > 0) --typeSettle;
         else
         {
-            const int t = scale::typeIndex (params[TYPE_PARAM].getValue() + inputs[TYPE_INPUT].getVoltage(), lastType);
+            const int t = scale::typeIndex (params[TYPE_PARAM].getValue() + scale::clampV (inputs[TYPE_INPUT].getVoltage()), lastType);
             if (t != lastType) { lastType = t; setKeys (scale::preset (t)); }
         }
         const bool randPressed = randBtn.process (params[RAND_PARAM].getValue() > 0.f);
@@ -84,7 +84,7 @@ struct Arpeggio : Module
         s.arpMode = params[MODE_PARAM].getValue() > 0.5f;
         s.octaves = (int) std::round (params[OCT_PARAM].getValue());
         s.dir = (arp::Dir) dir;
-        s.axis = clamp ((int) std::round (params[AXIS_PARAM].getValue() + inputs[AXIS_INPUT].getVoltage() * 12.f), -12, 12);
+        s.axis = clamp ((int) std::round (params[AXIS_PARAM].getValue() + scale::clampV (inputs[AXIS_INPUT].getVoltage()) * 12.f), -12, 12);
         s.passThrough = passThrough;
 
         // B normals to A: an unpatched B jack reads A's
@@ -98,7 +98,7 @@ struct Arpeggio : Module
         const bool patchedA = inputs[A_TRIG_INPUT].isConnected();
 
         const section::Out oa = a.process (cvA, edgeA, patchedA, s);
-        s.degrees = clamp ((int) std::round (params[INT_PARAM].getValue() + inputs[INT_INPUT].getVoltage() * 12.f), -12, 12);
+        s.degrees = clamp ((int) std::round (params[INT_PARAM].getValue() + scale::clampV (inputs[INT_INPUT].getVoltage()) * 12.f), -12, 12);
         const section::Out ob = b.process (cvB, edgeB, ownTrigB || patchedA, s);
 
         if (oa.trig) pulseA.trigger (1e-3f);

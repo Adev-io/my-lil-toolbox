@@ -1,5 +1,5 @@
 # Screenshot of a Rack window via PrintWindow (Rack does not have to be in front). Optional crop + nearest-neighbour zoom.
-# Saves to Desktop\screenshots by default (Ari's rule: every screenshot lands there).
+# Saves to Desktop\screenshots by default.
 param([Parameter(Mandatory)][int]$ProcId, [Parameter(Mandatory)][string]$Name, [int]$X = 0, [int]$Y = 0, [int]$W = 0, [int]$H = 0, [int]$Scale = 1)
 Add-Type -AssemblyName System.Drawing
 Add-Type @"
