@@ -425,6 +425,7 @@ void testRhythmWave()
     c.process (0.f, 0.5f, false, a, b);
     c.process (-0.7f, 0.5f, true, a, b);  // switched on with S already past -th
     check (! a && ! b, "wave: switching on below the threshold does not fire R'");
+    c.process (0.f, 0.f, false, a, b);   // an inactive stretch before RESET: reset must re-prime
     c.reset();
     c.process (0.f, 0.f, true, a, b);
     check (a && ! b, "wave: reset re-arms the downbeat");

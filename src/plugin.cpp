@@ -1,3 +1,3 @@
 #include "plugin.hpp"
 Plugin* pluginInstance;
-void init (Plugin* p) { pluginInstance = p; p->addModel (modelArpeggio); }
+void init (Plugin* p) { pluginInstance = p; p->addModel (modelArpeggio); p->addModel (modelRipple); }
