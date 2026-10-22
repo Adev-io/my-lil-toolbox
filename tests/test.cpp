@@ -1,4 +1,4 @@
-// test.cpp: checks the core (scale, arp, section) with plain asserts. Run: make test
+// test.cpp: checks the core (scale, arp, section, rhythm) with plain asserts. Run: make test
 // Author: Ari Klopfer / A_Development · MIT
 #include "Scale.h"
 #include "Arp.h"
@@ -334,6 +334,7 @@ void testRhythmGrid()
     check (gridPattern (p, 0x7u, 2, true, 12) == "x...x.x.x...", "grid density 2: R");
     check (gridPattern (p, 0x7u, 2, false, 12) == ".xxx.x.x.xxx", "grid density 2: R' is every other tick");
     check (gridPattern (p, 0x7u, 3, true, 12) == "x...........", "grid density 3: R");
+    check (gridPattern (p, 0x7u, 3, false, 12) == ".xxxxxxxxxxx", "grid density 3: R'");
     check (gridPattern (p, 0x7u, 4, true, 12) == "............", "grid density 4 above the active count: R never");
     check (gridPattern (p, 0x7u, 0, true, 2) == "x.", "grid: density below 1 acts as 1");
     check (rhythm::grid (6, p, 0x7u, 1).gens == 0x3u, "grid: tick 6 fires A and B", rhythm::grid (6, p, 0x7u, 1).gens);
@@ -418,6 +419,15 @@ void testRhythmWave()
     check (! a && ! b, "wave: inactive, no triggers");
     c.process (0.3f, 0.f, true, a, b);    // a generator switched on mid-wave, above 0
     check (! a && ! b, "wave: switching a generator on mid-wave does not fire");
+    c.process (0.f, 0.25f, false, a, b);  // nothing on again
+    c.process (0.6f, 0.25f, true, a, b);  // switched on with S already past +th
+    check (! a && ! b, "wave: switching on above the threshold does not fire R");
+    c.process (0.f, 0.5f, false, a, b);
+    c.process (-0.7f, 0.5f, true, a, b);  // switched on with S already past -th
+    check (! a && ! b, "wave: switching on below the threshold does not fire R'");
+    c.reset();
+    c.process (0.f, 0.f, true, a, b);
+    check (a && ! b, "wave: reset re-arms the downbeat");
 }
 // ---- tests (each task adds its functions above this line)
 }

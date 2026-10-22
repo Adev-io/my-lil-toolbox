@@ -92,6 +92,7 @@ struct Counter
 constexpr double twoPi = 6.283185307179586;   // M_PI is hidden by -std=c++11 on mingw
 
 // WAVE engine: each on generator is a sine with its period (in ticks), starting at the downbeat; the mean of them.
+// T = tick + fraction, as a double: in float the step near 720000 ticks is 1/16 tick and the wave becomes a staircase.
 inline float waveSum (double T, const int period[numGens], unsigned onMask)
 {
     double s = 0.0;
@@ -106,22 +107,33 @@ inline float waveSum (double T, const int period[numGens], unsigned onMask)
 }
 
 // Threshold crossings of the wave sum: R when it rises through +th, R' when it falls through -th.
+// At th = 0 an S sitting exactly at 0 fires R once (from the reset seed) and nothing after; a touch to 0 and back
+// fires at most one side. That is intended.
 struct Crossing
 {
     float prev = -1.f;   // -1 after reset, so the downbeat fires R at threshold 0
+    bool primed = true;  // false after an inactive stretch: the next active sample only records s
 
-    void reset() { prev = -1.f; }
+    void reset()
+    {
+        prev = -1.f;
+        primed = true;
+    }
 
     void process (float s, float th, bool active, bool& r, bool& rp)
     {
-        if (! active)   // nothing on: no triggers, and 0 so a generator switched on later does not fire at once
+        r = rp = false;
+        if (! active)   // nothing on: no triggers; the next active sample re-primes
         {
-            r = rp = false;
-            prev = 0.f;
+            primed = false;
             return;
         }
-        r = prev < th && s >= th;
-        rp = prev > -th && s <= -th;
+        if (primed)
+        {
+            r = prev < th && s >= th;
+            rp = prev > -th && s <= -th;
+        }
+        primed = true;
         prev = s;
     }
 };
