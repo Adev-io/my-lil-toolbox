@@ -365,6 +365,60 @@ void testRhythmCounter()
     c.t = rhythm::wrap - 3;
     check (c.nextBeat() == 0, "counter: nextBeat wraps");
 }
+// Runs the wave detector over ticks 0..ticks at 64 samples per tick; records where R and R' fire (in ticks).
+void waveCrossings (const int period[4], unsigned on, int density, double ticks, std::vector<double>& rAt, std::vector<double>& rpAt)
+{
+    rhythm::Crossing c;
+    const float th = (density - 1) / 4.f;
+    for (int i = 0; i < (int) (ticks * 64); ++i)
+    {
+        const double T = i / 64.0;
+        bool r = false, rp = false;
+        c.process (rhythm::waveSum (T, period, on), th, on != 0, r, rp);
+        if (r) rAt.push_back (T);
+        if (rp) rpAt.push_back (T);
+    }
+}
+
+void testRhythmWave()
+{
+    const int p[4] = { 4, 3, 2, 5 };
+    check (near (rhythm::waveSum (1.0, p, 0x1u), 1.0) && near (rhythm::waveSum (3.0, p, 0x1u), -1.0),
+           "wave: period 4 peaks at T=1 and dips at T=3");
+    check (near (rhythm::waveSum (0.5, p, 0x3u), (std::sin (rhythm::twoPi * 0.5 / 4) + std::sin (rhythm::twoPi * 0.5 / 3)) / 2),
+           "wave: the sum is the mean of the on sines", rhythm::waveSum (0.5, p, 0x3u));
+    check (rhythm::waveSum (1.3, p, 0u) == 0.f, "wave: nothing on, sum 0");
+
+    std::vector<double> r, rp;
+    waveCrossings (p, 0x1u, 1, 8.0, r, rp);
+    check (r.size() == 2 && r[0] < 0.02 && std::abs (r[1] - 4.0) < 0.02, "wave: one generator, R on its beats", (double) r.size());
+    check (rp.size() == 2 && std::abs (rp[0] - 2.0) < 0.02 && std::abs (rp[1] - 6.0) < 0.02, "wave: R' halfway between", (double) rp.size());
+
+    r.clear();
+    rp.clear();
+    waveCrossings (p, 0x1u, 3, 4.0, r, rp);   // threshold 0.5: sin rises past +0.5 at T = 1/3, falls past -0.5 at T = 7/3
+    check (r.size() == 1 && std::abs (r[0] - 1.0 / 3.0) < 0.02, "wave: density 3 fires R at the +0.5 crossing", r.empty() ? -1.0 : r[0]);
+    check (rp.size() == 1 && std::abs (rp[0] - 7.0 / 3.0) < 0.02, "wave: density 3 fires R' at the -0.5 crossing", rp.empty() ? -1.0 : rp[0]);
+
+    std::vector<double> r1, rp1, r4, rp4;
+    waveCrossings (p, 0x6u, 1, 12.0, r1, rp1);
+    waveCrossings (p, 0x6u, 4, 12.0, r4, rp4);
+    check (! r1.empty() && r4.size() < r1.size(), "wave: density 4 fires fewer R than density 1", (double) r4.size());
+
+    r.clear();
+    rp.clear();
+    waveCrossings (p, 0u, 1, 8.0, r, rp);
+    check (r.empty() && rp.empty(), "wave: nothing on, silent");
+
+    rhythm::Crossing c;
+    bool a = false, b = false;
+    c.process (0.f, 0.f, true, a, b);
+    check (a && ! b, "wave: after reset the downbeat fires R");
+    c.process (0.5f, 0.f, false, a, b);   // nothing on
+    check (! a && ! b, "wave: inactive, no triggers");
+    c.process (0.3f, 0.f, true, a, b);    // a generator switched on mid-wave, above 0
+    check (! a && ! b, "wave: switching a generator on mid-wave does not fire");
+}
 // ---- tests (each task adds its functions above this line)
 }
 
@@ -386,6 +440,7 @@ int main()
     testRhythmCycle();
     testRhythmGrid();
     testRhythmCounter();
+    testRhythmWave();
     // ---- calls (each task adds its calls above this line)
     std::printf ("\n%s: %d failure(s)\n", failures ? "FAILED" : "PASSED", failures);
     return failures ? 1 : 0;

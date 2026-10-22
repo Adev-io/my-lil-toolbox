@@ -88,4 +88,41 @@ struct Counter
         return t;
     }
 };
+
+constexpr double twoPi = 6.283185307179586;   // M_PI is hidden by -std=c++11 on mingw
+
+// WAVE engine: each on generator is a sine with its period (in ticks), starting at the downbeat; the mean of them.
+inline float waveSum (double T, const int period[numGens], unsigned onMask)
+{
+    double s = 0.0;
+    int n = 0;
+    for (int i = 0; i < numGens; ++i)
+        if ((onMask >> i) & 1u)
+        {
+            s += std::sin (twoPi * T / clampPeriod (period[i]));
+            ++n;
+        }
+    return n ? (float) (s / n) : 0.f;
+}
+
+// Threshold crossings of the wave sum: R when it rises through +th, R' when it falls through -th.
+struct Crossing
+{
+    float prev = -1.f;   // -1 after reset, so the downbeat fires R at threshold 0
+
+    void reset() { prev = -1.f; }
+
+    void process (float s, float th, bool active, bool& r, bool& rp)
+    {
+        if (! active)   // nothing on: no triggers, and 0 so a generator switched on later does not fire at once
+        {
+            r = rp = false;
+            prev = 0.f;
+            return;
+        }
+        r = prev < th && s >= th;
+        rp = prev > -th && s <= -th;
+        prev = s;
+    }
+};
 }
