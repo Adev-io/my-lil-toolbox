@@ -187,13 +187,13 @@ struct Ripple : Module
         if (lightDiv.process()) setLights (on, wave);
     }
 
-    // tempo light on each beat; PLAY lit while playing; MODE green = grid, amber = wave; ON latches lit while on
+    // tempo light on each beat; PLAY lit while playing; MODE lime = grid, magenta = wave; ON latches lit while on
     void setLights (unsigned on, bool wave)
     {
         lights[TEMPO_LIGHT].setBrightness (tempoOn ? 1.f : 0.f);
         lights[PLAY_LIGHT].setBrightness (play ? 1.f : 0.f);
-        lights[MODE_LIGHT + 0].setBrightness (wave ? 0.6f : 1.f);   // green
-        lights[MODE_LIGHT + 1].setBrightness (wave ? 1.f : 0.f);    // red; with green = amber
+        lights[MODE_LIGHT + 0].setBrightness (wave ? 0.f : 1.f);   // lime: grid
+        lights[MODE_LIGHT + 1].setBrightness (wave ? 1.f : 0.f);   // magenta: wave
         for (int i = 0; i < 4; ++i) lights[ON_LIGHT + i].setBrightness ((on >> i) & 1u ? 1.f : 0.f);
     }
 
@@ -238,18 +238,18 @@ struct RippleWidget : ModuleWidget
         auto at = [] (const float* mm) { return mm2px (Vec (mm[0], mm[1])); };
 
         addParam (createParamCentered<Rogan3PSWhite> (at (L::TEMPO_PARAM), module, Ripple::TEMPO_PARAM));
-        addChild (createLightCentered<SmallSimpleLight<YellowLight>> (at (L::TEMPO_LIGHT), module, Ripple::TEMPO_LIGHT));
+        addChild (createLightCentered<SmallSimpleLight<LimeLight>> (at (L::TEMPO_LIGHT), module, Ripple::TEMPO_LIGHT));
         addParam (createParamCentered<Rogan1PSWhite> (at (L::DENSITY_PARAM), module, Ripple::DENSITY_PARAM));
-        addParam (createLightParamCentered<VCVLightButton<MediumSimpleLight<GreenLight>>> (at (L::PLAY_PARAM), module, Ripple::PLAY_PARAM, Ripple::PLAY_LIGHT));
+        addParam (createLightParamCentered<VCVLightButton<MediumSimpleLight<LimeLight>>> (at (L::PLAY_PARAM), module, Ripple::PLAY_PARAM, Ripple::PLAY_LIGHT));
         addParam (createParamCentered<VCVButton> (at (L::RESET_PARAM), module, Ripple::RESET_PARAM));
-        addParam (createLightParamCentered<VCVLightLatch<MediumSimpleLight<GreenRedLight>>> (at (L::MODE_PARAM), module, Ripple::MODE_PARAM, Ripple::MODE_LIGHT));
+        addParam (createLightParamCentered<VCVLightLatch<MediumSimpleLight<LimeMagentaLight>>> (at (L::MODE_PARAM), module, Ripple::MODE_PARAM, Ripple::MODE_LIGHT));
 
         static const float* const periods[4] = { L::PERIOD0_PARAM, L::PERIOD1_PARAM, L::PERIOD2_PARAM, L::PERIOD3_PARAM };
         static const float* const ons[4] = { L::ON0_PARAM, L::ON1_PARAM, L::ON2_PARAM, L::ON3_PARAM };
         for (int i = 0; i < 4; ++i)
         {
             addParam (createParamCentered<Rogan1PSBlue> (at (periods[i]), module, Ripple::PERIOD_PARAM + i));
-            addParam (createLightParamCentered<VCVLightLatch<MediumSimpleLight<WhiteLight>>> (at (ons[i]), module, Ripple::ON_PARAM + i, Ripple::ON_LIGHT + i));
+            addParam (createLightParamCentered<VCVLightLatch<MediumSimpleLight<LimeLight>>> (at (ons[i]), module, Ripple::ON_PARAM + i, Ripple::ON_LIGHT + i));
         }
 
         static const float* const ins[Ripple::INPUTS_LEN] = { L::TEMPO_INPUT, L::PLAY_INPUT, L::RESET_INPUT, L::EXT_INPUT,

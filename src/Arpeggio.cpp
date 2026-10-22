@@ -111,7 +111,7 @@ struct Arpeggio : Module
         if (lightDiv.process()) setLights (mask, oa.pc, ob.pc, s.arpMode);
     }
 
-    // keys: dim white = in scale, green = A's note, blue = B's note (both = cyan). MODE: green quantizer, amber arp.
+    // keys: dim white = in scale, lime = A's note, blue = B's note. MODE: lime quantizer, magenta arp.
     void setLights (uint16_t mask, int pcA, int pcB, bool arpMode)
     {
         for (int i = 0; i < 12; ++i)
@@ -119,11 +119,11 @@ struct Arpeggio : Module
             const float in = (mask >> i) & 1u ? 0.25f : 0.f;
             const bool isA = i == pcA, isB = i == pcB;
             lights[KEY_LIGHT + 3 * i + 0].setBrightness (isA || isB ? 0.f : in);
-            lights[KEY_LIGHT + 3 * i + 1].setBrightness (isA ? 1.f : isB ? 0.f : in);
-            lights[KEY_LIGHT + 3 * i + 2].setBrightness (isB ? 1.f : isA ? 0.f : in);
+            lights[KEY_LIGHT + 3 * i + 1].setBrightness (isA ? 1.f : 0.f);
+            lights[KEY_LIGHT + 3 * i + 2].setBrightness (isB ? 1.f : 0.f);
         }
-        lights[MODE_LIGHT + 0].setBrightness (arpMode ? 0.6f : 1.f);   // green
-        lights[MODE_LIGHT + 1].setBrightness (arpMode ? 1.f : 0.f);    // red; with green = amber
+        lights[MODE_LIGHT + 0].setBrightness (arpMode ? 0.f : 1.f);   // lime: quantizer
+        lights[MODE_LIGHT + 1].setBrightness (arpMode ? 1.f : 0.f);   // magenta: arp
         for (int d = 0; d < arp::NUM_DIRS; ++d) lights[DIR_LIGHT + d].setBrightness (d == dir ? 1.f : 0.f);
     }
 
@@ -172,14 +172,14 @@ struct ArpeggioWidget : ModuleWidget
         static const float* const keys[12] = { L::KEY0_PARAM, L::KEY1_PARAM, L::KEY2_PARAM, L::KEY3_PARAM, L::KEY4_PARAM, L::KEY5_PARAM,
             L::KEY6_PARAM, L::KEY7_PARAM, L::KEY8_PARAM, L::KEY9_PARAM, L::KEY10_PARAM, L::KEY11_PARAM };
         for (int i = 0; i < 12; ++i)
-            addParam (createLightParamCentered<VCVLightBezelLatch<RedGreenBlueLight>> (at (keys[i]), module, Arpeggio::KEY_PARAM + i, Arpeggio::KEY_LIGHT + 3 * i));
+            addParam (createLightParamCentered<VCVLightBezelLatch<KeyLight>> (at (keys[i]), module, Arpeggio::KEY_PARAM + i, Arpeggio::KEY_LIGHT + 3 * i));
 
         addParam (createParamCentered<Rogan3PSWhite> (at (L::TYPE_PARAM), module, Arpeggio::TYPE_PARAM));
         addParam (createParamCentered<VCVButton> (at (L::RAND_PARAM), module, Arpeggio::RAND_PARAM));
-        addParam (createLightParamCentered<VCVLightLatch<MediumSimpleLight<GreenRedLight>>> (at (L::MODE_PARAM), module, Arpeggio::MODE_PARAM, Arpeggio::MODE_LIGHT));
+        addParam (createLightParamCentered<VCVLightLatch<MediumSimpleLight<LimeMagentaLight>>> (at (L::MODE_PARAM), module, Arpeggio::MODE_PARAM, Arpeggio::MODE_LIGHT));
         addParam (createParamCentered<VCVButton> (at (L::DIR_PARAM), module, Arpeggio::DIR_PARAM));
         static const float* const dirs[arp::NUM_DIRS] = { L::DIR0_LIGHT, L::DIR1_LIGHT, L::DIR2_LIGHT, L::DIR3_LIGHT };
-        for (int d = 0; d < arp::NUM_DIRS; ++d) addChild (createLightCentered<SmallSimpleLight<YellowLight>> (at (dirs[d]), module, Arpeggio::DIR_LIGHT + d));
+        for (int d = 0; d < arp::NUM_DIRS; ++d) addChild (createLightCentered<SmallSimpleLight<LimeLight>> (at (dirs[d]), module, Arpeggio::DIR_LIGHT + d));
         addParam (createParamCentered<Rogan1PSWhite> (at (L::OCT_PARAM), module, Arpeggio::OCT_PARAM));
         addParam (createParamCentered<Rogan1PSBlue> (at (L::AXIS_PARAM), module, Arpeggio::AXIS_PARAM));
         addParam (createParamCentered<Rogan1PSBlue> (at (L::INT_PARAM), module, Arpeggio::INT_PARAM));

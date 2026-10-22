@@ -2,6 +2,8 @@
 
 VCV Rack 2 modules by A_Development. MIT.
 
+Jack rings: blue = clock, reset and triggers; lime = pitch; magenta = CV modulation.
+
 ## Arpeggio
 
 A dual quantizer / arpeggiator. Sections A and B share one scale.
@@ -11,7 +13,7 @@ harmonic minor, dorian, phrygian, lydian, mixolydian, major pentatonic, minor pe
 1 V per preset. Your key edits stay until TYPE moves to another preset. RAND (button or trigger) rolls a random scale
 that always keeps C. With every key off, CV is not quantized (TRIG still samples it, AXIS still shifts it).
 
-**Modes.** MODE switches both sections between quantizer (green) and arpeggiator (amber).
+**Modes.** MODE switches both sections between quantizer (lime) and arpeggiator (magenta).
 - Quantizer: with TRIG unpatched, CV is quantized continuously and TRIG out fires on each new note. With TRIG patched,
   CV is sampled on each trigger; TRIG out still fires only when the note changes. Context menu "Triggers pass through (quantizer mode)":
   TRIG out fires on TRIG in instead.
@@ -24,7 +26,7 @@ AXIS transposes both outputs by -12..+12 semitones (CV: 1 V/oct) (knob + CV, -12
 
 **B follows A.** Unpatched B CV and B TRIG read A's, so with nothing in B you get A plus INTERVAL.
 
-**Lights.** Dim keys are in the scale; green is A's note, blue is B's (cyan when both), shown before AXIS. The DIR lights show U, D, UD or RND.
+**Lights.** Dim keys are in the scale; lime is A's note, blue is B's (both colors when they share a key), shown before AXIS. The DIR lights show U, D, UD or RND.
 
 ## Ripple
 
@@ -37,7 +39,7 @@ complementary rhythms, R and R'.
   On EXT, RESET waits for the next pulse.
 - **A-D**: PERIOD knob (1-16 sixteenths; CV adds 1 per volt), ON button, and a trigger output that fires every PERIOD
   ticks.
-- **MODE** (green = GRID, amber = WAVE) and **DENSITY** (1-4):
+- **MODE** (lime = GRID, magenta = WAVE) and **DENSITY** (1-4):
   - GRID: R fires on ticks where at least DENSITY generators hit; R' fires on every tick where R does not.
   - WAVE: each generator is a sine with its period; R fires when their average rises past a threshold set by DENSITY,
     R' when it falls past the negative threshold. Looser and off-grid.

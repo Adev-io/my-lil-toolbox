@@ -16,16 +16,18 @@ H = 128.5
 W = 5.08 * 12
 BAND = 8.6
 INK, INK2 = '#16161a', '#202027'
-LIME, MAGENTA, WHITE, DIM = '#c8ff3a', '#ff3d9a', '#f2f2f4', '#8d8d96'
+LIME, MAGENTA, BLUE, WHITE, DIM = '#c8ff3a', '#ff3d9a', '#5ac8e6', '#f2f2f4', '#8d8d96'
 FONT = os.environ.get('RACK_FONT', r'C:\Program Files\VCV\Rack2Free\res\fonts\DejaVuSans.ttf')
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # Radius in mm per kind, from the Rack component SVGs: hero Rogan3PS, knob Rogan1PS, key VCVLightBezelLatch (7.2 mm),
-# button VCVButton / VCVLightLatch (6.1 mm), light SmallSimpleLight, in = input jack (magenta ring), out = output jack
-RADIUS = {'hero': 8.8, 'knob': 6.7, 'key': 3.6, 'button': 3.1, 'light': 1.0, 'in': 4.0, 'out': 4.0}
-LABEL_SIZE = {'hero': 3.0, 'knob': 2.6, 'button': 2.4, 'light': 2.0, 'in': 2.4, 'out': 2.6}
+# button VCVButton / VCVLightLatch (6.1 mm), light SmallSimpleLight, out = output jack. Input jacks by role, ring coloured
+# as in My lil Acid Bass: seq = clock / reset / triggers (blue), play = pitch (lime), cv = modulation (magenta)
+RADIUS = {'hero': 8.8, 'knob': 6.7, 'key': 3.6, 'button': 3.1, 'light': 1.0, 'seq': 4.0, 'play': 4.0, 'cv': 4.0, 'out': 4.0}
+LABEL_SIZE = {'hero': 3.0, 'knob': 2.6, 'button': 2.4, 'light': 2.0, 'seq': 2.4, 'play': 2.4, 'cv': 2.4, 'out': 2.6}
+RING_COLOR = {'seq': BLUE, 'play': LIME, 'cv': MAGENTA}
 PAD_R = 4.8   # dark plate behind an output jack
-RING_R = RADIUS['in'] + 0.7   # magenta ring around an input jack
+RING_R = RADIUS['cv'] + 0.7   # ring around an input jack
 
 font = TTFont(FONT)
 glyphs, cmap, upm = font.getGlyphSet(), font.getBestCmap(), font['head'].unitsPerEm
@@ -61,16 +63,16 @@ for col, pc in zip(BLACK_AFTER, BLACK_PC):
 ROW_TYPE, ROW_MODE, ROW_AXIS, ROW_IN, ROW_OUT = 45.0, 65.0, 83.0, 102.0, 115.3
 JX = (8.48, 19.48, W / 2, 41.48, 52.48)   # jack-zone columns, 11 mm apart
 ARPEGGIO = [('KEY%d_PARAM' % pc, 'key', x, y, '') for pc, (x, y) in sorted(KEYS.items())] + [
-    ('TYPE_PARAM', 'hero', 15.0, ROW_TYPE, 'TYPE'), ('TYPE_INPUT', 'in', 31.0, ROW_TYPE, 'CV'),
-    ('RAND_PARAM', 'button', 43.0, ROW_TYPE, 'RAND'), ('RAND_INPUT', 'in', 54.0, ROW_TYPE, 'TRIG'),
+    ('TYPE_PARAM', 'hero', 15.0, ROW_TYPE, 'TYPE'), ('TYPE_INPUT', 'cv', 31.0, ROW_TYPE, 'CV'),
+    ('RAND_PARAM', 'button', 43.0, ROW_TYPE, 'RAND'), ('RAND_INPUT', 'seq', 54.0, ROW_TYPE, 'TRIG'),
     ('MODE_PARAM', 'button', 8.0, ROW_MODE, 'MODE'), ('DIR_PARAM', 'button', 19.0, ROW_MODE, 'DIR'),
 ] + [('DIR%d_LIGHT' % d, 'light', 27.0 + 5.0 * d, ROW_MODE, l) for d, l in enumerate(('U', 'D', 'UD', 'RND'))] + [
     ('OCT_PARAM', 'knob', 52.5, ROW_MODE, 'OCT'),
-    ('AXIS_PARAM', 'knob', 11.0, ROW_AXIS, 'AXIS'), ('AXIS_INPUT', 'in', 24.0, ROW_AXIS, 'CV'),
-    ('INT_PARAM', 'knob', 37.0, ROW_AXIS, 'INTERVAL'), ('INT_INPUT', 'in', 50.0, ROW_AXIS, 'CV'),
-    ('A_CV_INPUT', 'in', JX[0], ROW_IN, 'CV'), ('A_TRIG_INPUT', 'in', JX[1], ROW_IN, 'TRIG'),
-    ('RESET_INPUT', 'in', JX[2], ROW_IN, 'RESET'),
-    ('B_CV_INPUT', 'in', JX[3], ROW_IN, 'CV'), ('B_TRIG_INPUT', 'in', JX[4], ROW_IN, 'TRIG'),
+    ('AXIS_PARAM', 'knob', 11.0, ROW_AXIS, 'AXIS'), ('AXIS_INPUT', 'cv', 24.0, ROW_AXIS, 'CV'),
+    ('INT_PARAM', 'knob', 37.0, ROW_AXIS, 'INTERVAL'), ('INT_INPUT', 'cv', 50.0, ROW_AXIS, 'CV'),
+    ('A_CV_INPUT', 'play', JX[0], ROW_IN, 'CV'), ('A_TRIG_INPUT', 'seq', JX[1], ROW_IN, 'TRIG'),
+    ('RESET_INPUT', 'seq', JX[2], ROW_IN, 'RESET'),
+    ('B_CV_INPUT', 'play', JX[3], ROW_IN, 'CV'), ('B_TRIG_INPUT', 'seq', JX[4], ROW_IN, 'TRIG'),
     ('A_CV_OUTPUT', 'out', JX[0], ROW_OUT, 'CV'), ('A_TRIG_OUTPUT', 'out', JX[1], ROW_OUT, 'TRIG'),
     ('B_CV_OUTPUT', 'out', JX[3], ROW_OUT, 'CV'), ('B_TRIG_OUTPUT', 'out', JX[4], ROW_OUT, 'TRIG'),
 ]
@@ -89,14 +91,14 @@ def arpeggio_extras():
 GX = (8.73, 23.23, 37.73, 52.23)   # generator columns A-D, 14.5 mm apart; DENSITY and MODE share column D
 RIPPLE = [
     ('TEMPO_PARAM', 'hero', 12.0, 25.0, 'TEMPO'), ('TEMPO_LIGHT', 'light', 22.5, 17.5, ''),
-    ('TEMPO_INPUT', 'in', 27.0, 29.5, 'CV'), ('EXT_INPUT', 'in', 38.5, 29.5, 'EXT'),
+    ('TEMPO_INPUT', 'cv', 27.0, 29.5, 'CV'), ('EXT_INPUT', 'seq', 38.5, 29.5, 'EXT'),
     ('DENSITY_PARAM', 'knob', GX[3], 25.0, 'DENSITY'),
-    ('PLAY_PARAM', 'button', GX[0], 45.0, 'PLAY'), ('PLAY_INPUT', 'in', 17.8, 45.0, 'TRIG'),
-    ('RESET_PARAM', 'button', 29.5, 45.0, 'RESET'), ('RESET_INPUT', 'in', 38.5, 45.0, 'TRIG'),
+    ('PLAY_PARAM', 'button', GX[0], 45.0, 'PLAY'), ('PLAY_INPUT', 'seq', 17.8, 45.0, 'TRIG'),
+    ('RESET_PARAM', 'button', 29.5, 45.0, 'RESET'), ('RESET_INPUT', 'seq', 38.5, 45.0, 'TRIG'),
     ('MODE_PARAM', 'button', GX[3], 45.0, 'MODE'),
 ] + [part for i, (x, name) in enumerate(zip(GX, 'ABCD')) for part in (
     ('PERIOD%d_PARAM' % i, 'knob', x, 62.5, name), ('ON%d_PARAM' % i, 'button', x, 77.0, ''),
-    ('PERIOD%d_INPUT' % i, 'in', x, 87.5, ''), ('GEN%d_OUTPUT' % i, 'out', x, 101.0, name))] + [
+    ('PERIOD%d_INPUT' % i, 'cv', x, 87.5, ''), ('GEN%d_OUTPUT' % i, 'out', x, 101.0, name))] + [
     ('CLOCK_OUTPUT', 'out', GX[0], 115.3, 'CLOCK'), ('R_OUTPUT', 'out', GX[1], 115.3, 'R'),
     ('RP_OUTPUT', 'out', GX[2], 115.3, "R'"), ('ACCENT_OUTPUT', 'out', GX[3], 115.3, 'ACCENT'),
 ]
@@ -110,7 +112,7 @@ MODULES = {'Arpeggio': ('ARPEGGIO', ARPEGGIO, arpeggio_extras), 'Ripple': ('RIPP
 
 
 def reach(kind):
-    return RING_R if kind == 'in' else PAD_R if kind == 'out' else RADIUS[kind]
+    return RING_R if kind in RING_COLOR else PAD_R if kind == 'out' else RADIUS[kind]
 
 
 def overlaps(layout):
@@ -131,10 +133,10 @@ def panel(title, layout, extras):
     rowmax = {}   # labels in a row share one baseline, set by the row's biggest part
     for _, kind, x, y, _ in layout:
         if kind not in ('out', 'light', 'key'):
-            rowmax[y] = max(rowmax.get(y, 0), RING_R if kind == 'in' else RADIUS[kind])
+            rowmax[y] = max(rowmax.get(y, 0), RING_R if kind in RING_COLOR else RADIUS[kind])
     for _, kind, x, y, label in layout:
-        if kind == 'in':
-            out.append('<circle cx="%g" cy="%g" r="%g" fill="none" stroke="%s" stroke-width="0.5"/>' % (x, y, RING_R, MAGENTA))
+        if kind in RING_COLOR:
+            out.append('<circle cx="%g" cy="%g" r="%g" fill="none" stroke="%s" stroke-width="0.5"/>' % (x, y, RING_R, RING_COLOR[kind]))
         elif kind == 'out':
             out.append('<circle cx="%g" cy="%g" r="%g" fill="%s" stroke="%s" stroke-width="0.5"/>' % (x, y, PAD_R, INK, LIME))
         if not label:
