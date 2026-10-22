@@ -25,6 +25,7 @@ struct Ripple : Module
     double tickLen = 0.125;    // EXT: measured seconds per tick
     int pulses = 0;            // EXT pulses seen, counting up to 2 (two measure tickLen)
     int pending = 0;           // EXT per beat: in-between ticks still to play before the next pulse
+    bool skipMeasure = false;  // EXT: the first pulse after a resume keeps the old tickLen
     bool play = true;
     bool extPerBeat = false;   // context menu: EXT is 1 pulse per beat (else per 16th)
     bool clockBeats = false;   // context menu: CLOCK out fires on beats (else 16ths)
@@ -63,6 +64,7 @@ struct Ripple : Module
         cross.reset();
         phase = sinceTick = 0.0;
         pending = 0;
+        skipMeasure = false;
     }
 
     // One tick of the grid: generator, CLOCK, ACCENT and tempo-light pulses; R and R' too in GRID mode.
@@ -86,7 +88,15 @@ struct Ripple : Module
         const double dt = args.sampleTime;
         const bool playPressed = playBtn.process (params[PLAY_PARAM].getValue() > 0.f);
         const bool playTrigged = playTrig.process (inputs[PLAY_INPUT].getVoltage(), 0.1f, 1.f);
-        if (playPressed || playTrigged) play = ! play;
+        if (playPressed || playTrigged)
+        {
+            play = ! play;
+            if (play)
+            {
+                if (pulses < 2) pulses = 0;
+                else skipMeasure = true;
+            }
+        }
         const bool resetPressed = resetBtn.process (params[RESET_PARAM].getValue() > 0.f);
         const bool resetTrigged = resetTrig.process (inputs[RESET_INPUT].getVoltage(), 0.1f, 1.f);
         if (resetPressed || resetTrigged) restart();
@@ -115,18 +125,20 @@ struct Ripple : Module
             if (edge && play)
             {
                 if (pulses < 2) ++pulses;
-                if (pulses == 2) tickLen = extPerBeat ? sincePulse / 4.0 : sincePulse;
+                if (pulses == 2 && ! skipMeasure) tickLen = extPerBeat ? sincePulse / 4.0 : sincePulse;
+                skipMeasure = false;
                 sincePulse = sinceTick = 0.0;
                 fire (extPerBeat ? counter.nextBeat() : counter.next(), period, on, density, wave);
                 pending = extPerBeat ? 3 : 0;
             }
-            else if (play && pending > 0 && pulses == 2 && sinceTick >= tickLen)
+            else if (extPerBeat && play && pending > 0 && pulses == 2 && sinceTick >= tickLen)
             {
                 sinceTick -= tickLen;
                 --pending;
                 fire (counter.next(), period, on, density, wave);
             }
             if (pulses == 2 && ! counter.armed) frac = (float) std::min (sinceTick / tickLen, 0.999);
+            phase = frac;   // the internal clock continues from where EXT left off, so T does not jump
         }
         else
         {
@@ -157,7 +169,7 @@ struct Ripple : Module
         if (! counter.armed)
         {
             bool wr = false, wrp = false;
-            cross.process (rhythm::waveSum (counter.t + (double) frac, period, on), (density - 1) / 4.f, on != 0, wr, wrp);
+            cross.process (rhythm::waveSum (counter.t + (double) frac, period, on), rhythm::threshold (density), on != 0, wr, wrp);
             if (wave && play)
             {
                 if (wr) rPulse.trigger (1e-3f);

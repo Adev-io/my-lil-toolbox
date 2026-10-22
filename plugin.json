@@ -14,6 +14,6 @@
   "changelogUrl": "",
   "modules": [
     { "slug": "Arpeggio", "name": "Arpeggio", "description": "Dual quantizer and arpeggiator sharing one scale: 10 presets, an editable keyboard, and a scale-degree interval for in-key harmony", "tags": ["Quantizer", "Arpeggiator", "Random", "Dual"] },
-    { "slug": "Ripple", "name": "Ripple", "description": "Polyrhythm trigger generator: four period generators mixed on a grid or as summed waves into two complementary rhythms, with accent and clock outs", "tags": ["Clock generator", "Clock modifier", "Sequencer"] }
+    { "slug": "Ripple", "name": "Ripple", "description": "Polyrhythm trigger generator: four period generators mixed on a grid or as summed waves into two complementary rhythms, with accent and clock outs", "tags": ["Clock generator", "Clock modulator", "Sequencer"] }
   ]
 }
