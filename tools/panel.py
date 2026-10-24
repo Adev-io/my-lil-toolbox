@@ -20,11 +20,11 @@ LIME, MAGENTA, BLUE, WHITE, DIM = '#c8ff3a', '#ff3d9a', '#5ac8e6', '#f2f2f4', '#
 FONT = os.environ.get('RACK_FONT', r'C:\Program Files\VCV\Rack2Free\res\fonts\DejaVuSans.ttf')
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-# Radius in mm per kind, from the Rack component SVGs: hero Rogan3PS, knob Rogan1PS, key VCVLightBezelLatch (7.2 mm),
+# Radius in mm per kind, from the Rack component SVGs: hero Rogan3PS, knob Rogan1PS, tiny BefacoTinyKnob (8.6 mm), key VCVLightBezelLatch (7.2 mm),
 # button VCVButton / VCVLightLatch (6.1 mm), light SmallSimpleLight, out = output jack. Input jacks by role, ring coloured
 # as in My lil Acid Bass: seq = clock / reset / triggers (blue), play = pitch (lime), cv = modulation (magenta)
-RADIUS = {'hero': 8.8, 'knob': 6.7, 'key': 3.6, 'button': 3.1, 'light': 1.0, 'seq': 4.0, 'play': 4.0, 'cv': 4.0, 'out': 4.0}
-LABEL_SIZE = {'hero': 3.0, 'knob': 2.6, 'button': 2.4, 'light': 2.0, 'seq': 2.4, 'play': 2.4, 'cv': 2.4, 'out': 2.6}
+RADIUS = {'hero': 8.8, 'knob': 6.7, 'tiny': 4.3, 'key': 3.6, 'button': 3.1, 'light': 1.0, 'seq': 4.0, 'play': 4.0, 'cv': 4.0, 'out': 4.0}
+LABEL_SIZE = {'hero': 3.0, 'knob': 2.6, 'tiny': 2.4, 'button': 2.4, 'light': 2.0, 'seq': 2.4, 'play': 2.4, 'cv': 2.4, 'out': 2.6}
 RING_COLOR = {'seq': BLUE, 'play': LIME, 'cv': MAGENTA}
 PAD_R = 4.8   # dark plate behind an output jack
 RING_R = RADIUS['cv'] + 0.7   # ring around an input jack
@@ -33,11 +33,16 @@ font = TTFont(FONT)
 glyphs, cmap, upm = font.getGlyphSet(), font.getBestCmap(), font['head'].unitsPerEm
 
 
+def width(s, size):
+    """Advance width of the string in mm at this em size."""
+    return sum(glyphs[cmap[ord(c)]].width for c in s) * size / upm
+
+
 def text(s, x, y, size, fill, anchor='middle', stroke=0.0):
     """One <path> for the string: baseline at y, em size in mm, optional stroke for a bolder face."""
     k = size / upm
-    width = sum(glyphs[cmap[ord(c)]].width for c in s) * k
-    pen_x = x - width / 2 if anchor == 'middle' else x - width if anchor == 'end' else x
+    w = width(s, size)
+    pen_x = x - w / 2 if anchor == 'middle' else x - w if anchor == 'end' else x
     d = []
     for c in s:
         g = glyphs[cmap[ord(c)]]
@@ -47,6 +52,37 @@ def text(s, x, y, size, fill, anchor='middle', stroke=0.0):
         pen_x += g.width * k
     bold = ' stroke="%s" stroke-width="%g" stroke-linejoin="round"' % (fill, stroke) if stroke else ''
     return '<path fill="%s"%s d="%s"/>' % (fill, bold, ' '.join(d))
+
+
+# ---- the title band, shared by every module: Rack's screws sit in its corners (5.08 mm squares at x 5.08 and
+# W - 10.16), so the title starts right of the left one and the face sits left of the right one
+TITLE_X = 11.2
+MASCOT_X = W - 14.46   # 46.5 on 12 HP
+MASCOT_R = BAND * 0.36
+
+
+def mascot(cx, cy, r):
+    """A little acid face: magenta disc, dot eyes, a wavy mouth. The same face as My lil Acid Bass."""
+    e, m = r * 0.37, r * 0.29
+    return ''.join([
+        '<circle cx="%g" cy="%g" r="%g" fill="%s"/>' % (cx, cy, r, MAGENTA),
+        '<circle cx="%g" cy="%g" r="%g" fill="%s"/>' % (cx - e, cy - r * 0.32, r * 0.145, INK),
+        '<circle cx="%g" cy="%g" r="%g" fill="%s"/>' % (cx + e, cy - r * 0.32, r * 0.145, INK),
+        '<path d="M %g %g q %g %g %g 0 q %g %g %g 0" fill="none" stroke="%s" stroke-width="%g" stroke-linecap="round"/>'
+        % (cx - 2 * m, cy + r * 0.29, m, r * 0.45, 2 * m, m, -r * 0.45, 2 * m, INK, r * 0.16),
+    ])
+
+
+def band(title):
+    """The band's art: lime strip, the title at the left, the face at the right."""
+    return ['<rect width="%g" height="%g" fill="%s"/>' % (W, BAND, LIME),
+            text(title, TITLE_X, 6.3, 4.3, INK, 'start', 0.39), mascot(MASCOT_X, BAND / 2, MASCOT_R)]
+
+
+def band_boxes(title):
+    """Where the title and the face are, as (x0, y0, x1, y1), for the panel check."""
+    return [('title', (TITLE_X, 6.3 - 0.73 * 4.3, TITLE_X + width(title, 4.3), 6.3)),
+            ('mascot', (MASCOT_X - MASCOT_R, BAND / 2 - MASCOT_R, MASCOT_X + MASCOT_R, BAND / 2 + MASCOT_R))]
 
 
 # ---- Arpeggio
@@ -87,25 +123,38 @@ def arpeggio_extras():
 
 
 # ---- Ripple: tempo row (CV and EXT jacks sit lower, on a label row of their own), transport pairs PLAY+TRIG and
-# RESET+TRIG with MODE alone, four generator columns (PERIOD, ON, CV, out), then the mix outputs
-GX = (8.73, 23.23, 37.73, 52.23)   # generator columns A-D, 14.5 mm apart; DENSITY and MODE share column D
+# RESET+TRIG with MODE alone, four generator columns (PERIOD, ON, CV, out) captioned in the left margin, then the mix
+# outputs under an OUT header
+GX = (10.5, 25.0, 39.5, 54.0)   # generator columns A-D, 14.5 mm apart; DENSITY and MODE share column D
+ROW_PERIOD, ROW_ON, ROW_CV = 62.0, 75.0, 86.0
 RIPPLE = [
     ('TEMPO_PARAM', 'hero', 12.0, 25.0, 'TEMPO'), ('TEMPO_LIGHT', 'light', 22.5, 17.5, ''),
     ('TEMPO_INPUT', 'cv', 27.0, 29.5, 'CV'), ('EXT_INPUT', 'seq', 38.5, 29.5, 'EXT'),
-    ('DENSITY_PARAM', 'knob', GX[3], 25.0, 'DENSITY'),
-    ('PLAY_PARAM', 'button', GX[0], 45.0, 'PLAY'), ('PLAY_INPUT', 'seq', 17.8, 45.0, 'TRIG'),
-    ('RESET_PARAM', 'button', 29.5, 45.0, 'RESET'), ('RESET_INPUT', 'seq', 38.5, 45.0, 'TRIG'),
+    ('DENSITY_PARAM', 'tiny', GX[3], 25.0, 'DENSITY'),
+    ('PLAY_PARAM', 'button', GX[0], 45.0, 'PLAY'), ('PLAY_INPUT', 'seq', 19.6, 45.0, 'TRIG'),
+    ('RESET_PARAM', 'button', 30.5, 45.0, 'RESET'), ('RESET_INPUT', 'seq', 39.6, 45.0, 'TRIG'),
     ('MODE_PARAM', 'button', GX[3], 45.0, 'MODE'),
 ] + [part for i, (x, name) in enumerate(zip(GX, 'ABCD')) for part in (
-    ('PERIOD%d_PARAM' % i, 'knob', x, 62.5, name), ('ON%d_PARAM' % i, 'button', x, 77.0, ''),
-    ('PERIOD%d_INPUT' % i, 'cv', x, 87.5, ''), ('GEN%d_OUTPUT' % i, 'out', x, 101.0, name))] + [
+    ('PERIOD%d_PARAM' % i, 'tiny', x, ROW_PERIOD, name), ('ON%d_PARAM' % i, 'button', x, ROW_ON, ''),
+    ('PERIOD%d_INPUT' % i, 'cv', x, ROW_CV, ''), ('GEN%d_OUTPUT' % i, 'out', x, 101.0, name))] + [
     ('CLOCK_OUTPUT', 'out', GX[0], 115.3, 'CLOCK'), ('R_OUTPUT', 'out', GX[1], 115.3, 'R'),
     ('RP_OUTPUT', 'out', GX[2], 115.3, "R'"), ('ACCENT_OUTPUT', 'out', GX[3], 115.3, 'ACCENT'),
 ]
 
 
+def caption(s, y):
+    """A row caption in the left margin, reading upwards, centred on the row."""
+    return '<g transform="rotate(-90 3.4 %g)">%s</g>' % (y, text(s, 3.4, y + 0.8, 2.2, DIM))
+
+
 def ripple_extras():
-    return ['<rect x="2.5" y="94.5" width="%g" height="29.2" rx="2" fill="%s"/>' % (W - 5, INK2)]   # jack zone
+    return [
+        '<rect x="2.5" y="95" width="%g" height="28.7" rx="2" fill="%s"/>' % (W - 5, INK2),   # jack zone
+        '<rect x="2.5" y="93.1" width="%g" height="0.5" fill="%s"/>' % (W - 5, MAGENTA),      # OUT header, as Acid Bass's PLAY
+        '<rect x="%g" y="91.5" width="11" height="4.2" fill="%s"/>' % (W / 2 - 5.5, INK),
+        text('OUT', W / 2, 94.6, 3.0, MAGENTA, stroke=0.2),
+        caption('PERIOD', ROW_PERIOD), caption('ON', ROW_ON), caption('CV', ROW_CV),
+    ]
 
 
 MODULES = {'Arpeggio': ('ARPEGGIO', ARPEGGIO, arpeggio_extras), 'Ripple': ('RIPPLE', RIPPLE, ripple_extras)}
@@ -126,8 +175,7 @@ def panel(title, layout, extras):
         '<?xml version="1.0" encoding="UTF-8"?>',
         '<svg xmlns="http://www.w3.org/2000/svg" width="%gmm" height="%gmm" viewBox="0 0 %g %g">' % (W, H, W, H),
         '<rect width="%g" height="%g" fill="%s"/>' % (W, H, INK),
-        '<rect width="%g" height="%g" fill="%s"/>' % (W, BAND, LIME),
-        text(title, W / 2, 6.3, 4.3, INK, stroke=0.39),
+    ] + band(title) + [
         text('my lil toolbox', W / 2, 12.6, 2.4, WHITE, stroke=0.12),
     ] + extras()
     rowmax = {}   # labels in a row share one baseline, set by the row's biggest part

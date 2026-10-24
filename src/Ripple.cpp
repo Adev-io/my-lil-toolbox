@@ -183,7 +183,7 @@ struct RippleWidget : ModuleWidget
 
         addParam (createParamCentered<Rogan3PSWhite> (at (L::TEMPO_PARAM), module, Ripple::TEMPO_PARAM));
         addChild (createLightCentered<SmallSimpleLight<LimeLight>> (at (L::TEMPO_LIGHT), module, Ripple::TEMPO_LIGHT));
-        addParam (createParamCentered<Rogan1PSWhite> (at (L::DENSITY_PARAM), module, Ripple::DENSITY_PARAM));
+        addParam (createParamCentered<BefacoTinyKnob> (at (L::DENSITY_PARAM), module, Ripple::DENSITY_PARAM));
         addParam (createLightParamCentered<VCVLightButton<MediumSimpleLight<LimeLight>>> (at (L::PLAY_PARAM), module, Ripple::PLAY_PARAM, Ripple::PLAY_LIGHT));
         addParam (createParamCentered<VCVButton> (at (L::RESET_PARAM), module, Ripple::RESET_PARAM));
         addParam (createLightParamCentered<VCVLightLatch<MediumSimpleLight<LimeMagentaLight>>> (at (L::MODE_PARAM), module, Ripple::MODE_PARAM, Ripple::MODE_LIGHT));
@@ -192,7 +192,7 @@ struct RippleWidget : ModuleWidget
         static const float* const ons[4] = { L::ON0_PARAM, L::ON1_PARAM, L::ON2_PARAM, L::ON3_PARAM };
         for (int i = 0; i < 4; ++i)
         {
-            addParam (createParamCentered<Rogan1PSBlue> (at (periods[i]), module, Ripple::PERIOD_PARAM + i));
+            addParam (createParamCentered<BefacoTinyKnob> (at (periods[i]), module, Ripple::PERIOD_PARAM + i));
             addParam (createLightParamCentered<VCVLightLatch<MediumSimpleLight<LimeLight>>> (at (ons[i]), module, Ripple::ON_PARAM + i, Ripple::ON_LIGHT + i));
         }
 
