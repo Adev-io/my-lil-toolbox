@@ -36,7 +36,7 @@ complementary rhythms, R and R'.
 - **TEMPO** 30-300 BPM; the CV input is exponential (+1 V doubles). Patch **EXT** to clock it from outside: one pulse
   per 16th, or per beat (context menu).
 - **PLAY** and **RESET** buttons, each with a trigger input. RESET returns to the downbeat, where every generator lines up.
-  On EXT, RESET waits for the next pulse.
+  On EXT, RESET waits for the next pulse. Loading a preset also returns to the downbeat.
 - **A-D**: PERIOD knob (1-16 sixteenths; CV adds 1 per volt), ON button, and a trigger output that fires every PERIOD
   ticks.
 - **MODE** (lime = GRID, magenta = WAVE) and **DENSITY** (1-4):

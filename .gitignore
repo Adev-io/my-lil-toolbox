@@ -5,3 +5,4 @@ plugin.so
 plugin.dylib
 *.o
 *.d
+__pycache__/
