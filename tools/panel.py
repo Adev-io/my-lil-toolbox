@@ -125,8 +125,9 @@ def arpeggio_extras():
 # ---- Ripple: tempo row (CV and EXT jacks sit lower, on a label row of their own), transport pairs PLAY+TRIG and
 # RESET+TRIG with MODE alone, four generator columns (PERIOD, ON, CV, out) captioned in the left margin, then the mix
 # outputs under an OUT header
-GX = (10.5, 25.0, 39.5, 54.0)   # generator columns A-D, 14.5 mm apart; DENSITY and MODE share column D
+GX = (10.5, 24.5, 38.5, 52.5)   # generator columns A-D, 14 mm apart (plate D stays inside the jack zone); DENSITY and MODE share column D
 ROW_PERIOD, ROW_ON, ROW_CV = 62.0, 75.0, 86.0
+OUT_X = (GX[0] + GX[3]) / 2   # the OUT header sits over the middle of the generator grid
 RIPPLE = [
     ('TEMPO_PARAM', 'hero', 12.0, 25.0, 'TEMPO'), ('TEMPO_LIGHT', 'light', 22.5, 17.5, ''),
     ('TEMPO_INPUT', 'cv', 27.0, 29.5, 'CV'), ('EXT_INPUT', 'seq', 38.5, 29.5, 'EXT'),
@@ -151,8 +152,8 @@ def ripple_extras():
     return [
         '<rect x="2.5" y="95" width="%g" height="28.7" rx="2" fill="%s"/>' % (W - 5, INK2),   # jack zone
         '<rect x="2.5" y="93.1" width="%g" height="0.5" fill="%s"/>' % (W - 5, MAGENTA),      # OUT header, as Acid Bass's PLAY
-        '<rect x="%g" y="91.5" width="11" height="4.2" fill="%s"/>' % (W / 2 - 5.5, INK),
-        text('OUT', W / 2, 94.6, 3.0, MAGENTA, stroke=0.2),
+        '<rect x="%g" y="91.5" width="11" height="4.2" fill="%s"/>' % (OUT_X - 5.5, INK),
+        text('OUT', OUT_X, 94.6, 3.0, MAGENTA, stroke=0.2),
         caption('PERIOD', ROW_PERIOD), caption('ON', ROW_ON), caption('CV', ROW_CV),
     ]
 
