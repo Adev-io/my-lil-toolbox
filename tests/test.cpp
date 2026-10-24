@@ -9,6 +9,7 @@
 #include <cstdio>
 #include <initializer_list>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace
@@ -22,6 +23,36 @@ void check (bool ok, const char* what, double got = 0.0)
 }
 bool near (double a, double b, double tol = 1e-5) { return std::abs (a - b) <= tol; }
 uint16_t maskOf (std::initializer_list<int> pcs) { uint16_t m = 0; for (int p : pcs) m |= (uint16_t) (1u << p); return m; }
+typedef std::vector<std::pair<int, uint32_t>> Ticks;   // (sample index, tick number)
+const double clockDt = 1.0 / 1024;   // a power of two: 120 BPM is exactly 128 samples per tick, EXT intervals are exact
+
+// Advances the clock n samples. EXT edges fire on the sample indexes in `edges` (relative to this run). Appends every
+// tick played as (sample, tick) to `out` and returns how many this run played.
+int runClock (rhythm::Clock& c, int n, bool ext, std::initializer_list<int> edges, bool play, bool perBeat, Ticks& out, float bpm = 120.f)
+{
+    int count = 0;
+    for (int i = 0; i < n; ++i)
+    {
+        bool edge = false;
+        for (int e : edges) edge = edge || e == i;
+        uint32_t tick = 0;
+        if (c.process (clockDt, bpm, ext, edge, play, perBeat, tick))
+        {
+            out.push_back (std::make_pair (i, tick));
+            ++count;
+        }
+    }
+    return count;
+}
+
+bool sameTicks (const Ticks& got, std::initializer_list<std::pair<int, uint32_t>> want)
+{
+    if (got.size() != want.size()) return false;
+    size_t i = 0;
+    for (const std::pair<int, uint32_t>& w : want)
+        if (got[i++] != w) return false;
+    return true;
+}
 
 void testPresets()
 {
@@ -432,6 +463,112 @@ void testRhythmWave()
     c.process (0.f, 0.f, true, a, b);
     check (a && ! b, "wave: reset re-arms the downbeat");
 }
+// The clock at 1024 Hz. Each check replays one rule of the spec or one of the fixed review bugs (F13, F15, F16, F17, F20).
+void testRhythmClock()
+{
+    {   // 1. internal 120 BPM: the downbeat at once, then one tick every 128 samples
+        rhythm::Clock c;
+        Ticks t;
+        runClock (c, 400, false, {}, true, false, t);
+        check (sameTicks (t, { { 0, 0 }, { 128, 1 }, { 256, 2 }, { 384, 3 } }), "clock: internal 120 BPM ticks every 128 samples from sample 0", t.size());
+    }
+    {   // 2. internal stop holds the phase; resume continues from it
+        rhythm::Clock c;
+        Ticks t;
+        runClock (c, 200, false, {}, true, false, t);   // ticks 0 and 1; phase 71/128 afterwards
+        Ticks stopped;
+        const int n = runClock (c, 1000, false, {}, false, false, stopped);
+        c.resume();
+        Ticks resumed;
+        runClock (c, 100, false, {}, true, false, resumed);
+        check (n == 0 && sameTicks (resumed, { { 56, 2 } }), "clock: stopped internal clock holds; resume plays tick 2 after the remaining 57 samples", resumed.empty() ? -1 : resumed[0].first);
+    }
+    {   // 3. EXT per 16th: one tick per edge; frac 0 until the second edge, then rising, capped at 0.999 when edges stop
+        rhythm::Clock c;
+        Ticks t;
+        runClock (c, 100, true, { 0 }, true, false, t);
+        const bool fracZero = c.frac == 0.f;
+        runClock (c, 50, true, { 0 }, true, false, t);   // second edge, 100 samples after the first
+        const bool fracHalf = near (c.frac, 0.49);
+        const int late = runClock (c, 300, true, {}, true, false, t);
+        check (sameTicks (t, { { 0, 0 }, { 0, 1 } }) && fracZero && fracHalf && late == 0 && near (c.frac, 0.999),
+               "clock: EXT per 16th plays a tick per edge; frac 0, then 0.49, then holds at 0.999", c.frac);
+    }
+    {   // 4. EXT per beat: in-between ticks at a quarter of the measured interval; an early edge drops the rest
+        rhythm::Clock c;
+        Ticks t;
+        runClock (c, 100, true, { 0, 40, 80 }, true, true, t);
+        const bool spaced = sameTicks (t, { { 0, 0 }, { 40, 4 }, { 50, 5 }, { 60, 6 }, { 70, 7 }, { 80, 8 }, { 90, 9 } });
+        Ticks early;
+        runClock (c, 60, true, { 5 }, true, true, early);   // tick 10 is due at sample 0; the edge at 5 is early
+        bool jumped = early.size() == 5;
+        if (jumped)
+        {
+            const uint32_t want[5] = { 10, 12, 13, 14, 15 };
+            for (int i = 0; i < 5; ++i) jumped = jumped && early[i].second == want[i];
+            jumped = jumped && early[1].first == 5;
+        }
+        check (spaced && jumped, "clock: EXT per beat fills three ticks per beat; an early edge skips to the next beat", early.size());
+    }
+    {   // 5. F13: while stopped, EXT edges are ignored and the timers do not advance
+        rhythm::Clock c;
+        Ticks t;
+        runClock (c, 150, true, { 0, 100 }, true, false, t);   // frac 0.49 afterwards
+        Ticks stopped;
+        const int n = runClock (c, 500, true, { 50, 150 }, false, false, stopped);
+        check (n == 0 && near (c.frac, 0.49) && c.counter.t == 1, "clock: F13 stopped EXT ignores edges and freezes frac", c.frac);
+    }
+    {   // 6. F15: the first edge after a resume keeps the old tick length
+        rhythm::Clock c;
+        Ticks t;
+        runClock (c, 100, true, { 0, 40 }, true, true, t);   // tickLen = 10 samples
+        Ticks stopped;
+        runClock (c, 2000, true, {}, false, true, stopped);
+        c.resume();
+        Ticks after;
+        runClock (c, 100, true, { 0, 40 }, true, true, after);   // 60 samples since the last edge, yet spacing stays 10
+        check (sameTicks (after, { { 0, 8 }, { 10, 9 }, { 20, 10 }, { 30, 11 }, { 40, 12 }, { 50, 13 }, { 60, 14 }, { 70, 15 } }), "clock: F15 first edge after resume keeps the measured tick length", after.size());
+    }
+    {   // 7. F16: unpatching EXT continues the internal clock from frac, no early tick
+        rhythm::Clock c;
+        Ticks t;
+        runClock (c, 151, true, { 0, 100 }, true, false, t);   // frac 0.5 afterwards
+        Ticks internal;
+        runClock (c, 150, false, {}, true, false, internal);   // 150 < 63 + 128: only one tick fits
+        check (sameTicks (internal, { { 63, 2 } }), "clock: F16 unpatched EXT hands the internal clock phase 0.5 (tick after 64 samples)", internal.empty() ? -1 : internal[0].first);
+    }
+    {   // 8. F17: switching per beat -> per 16th mid-beat plays no leftover in-between tick
+        rhythm::Clock c;
+        Ticks t;
+        runClock (c, 45, true, { 0, 40 }, true, true, t);   // pending 3 after the edge at 40
+        Ticks leftover;
+        const int n = runClock (c, 100, true, {}, true, false, leftover);
+        Ticks next;
+        runClock (c, 1, true, { 0 }, true, false, next);
+        check (n == 0 && sameTicks (next, { { 0, 5 } }), "clock: F17 per-16th mode plays no pending per-beat tick; the next edge plays tick 5", n);
+    }
+    {   // 9. F20: reset and resume in the same sample keep the resume flag and arm tick 0
+        rhythm::Clock c;
+        Ticks t;
+        runClock (c, 100, true, { 0, 40 }, true, true, t);
+        Ticks stopped;
+        runClock (c, 500, true, {}, false, true, stopped);
+        c.resume();   // RUN...
+        c.reset();    // ...and RESET in the same sample
+        Ticks after;
+        runClock (c, 100, true, { 0, 40 }, true, true, after);
+        check (sameTicks (after, { { 0, 0 }, { 10, 1 }, { 20, 2 }, { 30, 3 }, { 40, 4 }, { 50, 5 }, { 60, 6 }, { 70, 7 } }), "clock: F20 RESET with RUN keeps the old tick length and plays tick 0", after.size());
+    }
+    {   // 10. RESET on EXT: the next edge plays tick 0 instead of advancing
+        rhythm::Clock c;
+        Ticks t;
+        runClock (c, 250, true, { 0, 100, 200 }, true, false, t);
+        c.reset();
+        Ticks after;
+        runClock (c, 50, true, { 0 }, true, false, after);
+        check (sameTicks (after, { { 0, 0 } }) && c.counter.t == 0, "clock: RESET on EXT makes the next edge play tick 0", c.counter.t);
+    }
+}
 // ---- tests (each task adds its functions above this line)
 }
 
@@ -454,6 +591,7 @@ int main()
     testRhythmGrid();
     testRhythmCounter();
     testRhythmWave();
+    testRhythmClock();
     // ---- calls (each task adds its calls above this line)
     std::printf ("\n%s: %d failure(s)\n", failures ? "FAILED" : "PASSED", failures);
     return failures ? 1 : 0;

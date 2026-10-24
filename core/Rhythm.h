@@ -1,7 +1,8 @@
-// Rhythm.h: Ripple's core. The tick counter, the GRID engine (R, R', ACCENT) and the WAVE engine. No Rack headers.
+// Rhythm.h: Ripple's core. The tick counter and clock, the GRID engine (R, R', ACCENT) and the WAVE engine. No Rack headers.
 // One tick = one 16th note. Generator i (0 = A .. 3 = D) is on when bit i of onMask is set.
 // Author: Ari Klopfer / A_Development · MIT
 #pragma once
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
 
@@ -86,6 +87,93 @@ struct Counter
         if (armed) armed = false;
         else t = (t / 4 + 1) * 4 % wrap;
         return t;
+    }
+};
+
+// The clock: ticks from the internal tempo or from EXT pulses, the PLAY hold, the measured EXT interval and the
+// per-beat in-between ticks. One call per sample; at most one tick per sample. frac = position inside the current tick.
+struct Clock
+{
+    Counter counter;
+    float frac = 0.f;          // 0..1 (capped at 0.999 on EXT, so it holds just short of the next tick)
+    double phase = 0.0;        // internal clock: position inside the current tick, 0..1
+    double sinceTick = 0.0;    // EXT: seconds since the last tick played
+    double sincePulse = 0.0;   // EXT: seconds since the last pulse
+    double tickLen = 0.125;    // EXT: measured seconds per tick
+    int pulses = 0;            // EXT pulses seen, counting up to 2 (two measure tickLen)
+    int pending = 0;           // EXT per beat: in-between ticks still to play before the next pulse
+    bool skipMeasure = false;  // EXT: the first pulse after a resume keeps the old tickLen
+
+    void reset()   // RESET: back to an armed downbeat
+    {
+        counter.reset();
+        phase = sinceTick = 0.0;
+        pending = 0;
+    }
+
+    void resume()   // play turned on (PLAY, Initialize, preset load): a stop of unknown length sits before the next pulse
+    {
+        if (pulses < 2) pulses = 0;
+        else skipMeasure = true;
+    }
+
+    // dt: seconds per sample. bpm: internal tempo, already clamped. ext: EXT patched. edge: EXT rising edge this sample.
+    // Returns true when a tick plays; tick is then its number.
+    bool process (double dt, float bpm, bool ext, bool edge, bool play, bool perBeat, uint32_t& tick)
+    {
+        bool fired = false;
+        if (ext)
+        {
+            if (play)
+            {
+                sinceTick += dt;
+                sincePulse += dt;
+            }
+            if (edge && play)
+            {
+                if (pulses < 2) ++pulses;
+                if (pulses == 2 && ! skipMeasure) tickLen = perBeat ? sincePulse / 4.0 : sincePulse;
+                skipMeasure = false;
+                sincePulse = sinceTick = 0.0;
+                tick = perBeat ? counter.nextBeat() : counter.next();
+                pending = perBeat ? 3 : 0;
+                fired = true;
+            }
+            else if (perBeat && play && pending > 0 && pulses == 2 && sinceTick >= tickLen)
+            {
+                sinceTick -= tickLen;
+                --pending;
+                tick = counter.next();
+                fired = true;
+            }
+            frac = pulses == 2 && ! counter.armed ? (float) std::min (sinceTick / tickLen, 0.999) : 0.f;
+            phase = frac;   // the internal clock continues from where EXT left off, so T does not jump
+        }
+        else
+        {
+            pulses = 0;   // EXT unpatched: the next patch re-measures its interval from two fresh pulses
+            if (play)
+            {
+                if (counter.armed)   // power-on or RESET: the downbeat plays at once
+                {
+                    phase = 0.0;
+                    tick = counter.next();
+                    fired = true;
+                }
+                else
+                {
+                    phase += bpm * 4.0 / 60.0 * dt;
+                    if (phase >= 1.0)
+                    {
+                        phase -= 1.0;
+                        tick = counter.next();
+                        fired = true;
+                    }
+                }
+            }
+            frac = (float) phase;
+        }
+        return fired;
     }
 };
 
