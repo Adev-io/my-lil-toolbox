@@ -13,19 +13,12 @@ struct Ripple : Module
     enum OutputId { ENUMS (GEN_OUTPUT, 4), CLOCK_OUTPUT, R_OUTPUT, RP_OUTPUT, ACCENT_OUTPUT, OUTPUTS_LEN };
     enum LightId { TEMPO_LIGHT, PLAY_LIGHT, ENUMS (MODE_LIGHT, 2), ENUMS (ON_LIGHT, 4), LIGHTS_LEN };
 
-    rhythm::Counter counter;
+    rhythm::Clock clock;
     rhythm::Crossing cross;
     dsp::SchmittTrigger playTrig, resetTrig, extTrig;
     dsp::BooleanTrigger playBtn, resetBtn;
     dsp::PulseGenerator genPulse[4], clockPulse, rPulse, rpPulse, accentPulse, tempoPulse;
     dsp::ClockDivider lightDiv;
-    double phase = 0.0;        // internal clock: position inside the current tick, 0..1
-    double sinceTick = 0.0;    // EXT: seconds since the last tick played
-    double sincePulse = 0.0;   // EXT: seconds since the last pulse
-    double tickLen = 0.125;    // EXT: measured seconds per tick
-    int pulses = 0;            // EXT pulses seen, counting up to 2 (two measure tickLen)
-    int pending = 0;           // EXT per beat: in-between ticks still to play before the next pulse
-    bool skipMeasure = false;  // EXT: the first pulse after a resume keeps the old tickLen
     bool play = true;
     bool extPerBeat = false;   // context menu: EXT is 1 pulse per beat (else per 16th)
     bool clockBeats = false;   // context menu: CLOCK out fires on beats (else 16ths)
@@ -60,10 +53,8 @@ struct Ripple : Module
 
     void restart()   // RESET: back to an armed downbeat
     {
-        counter.reset();
+        clock.reset();
         cross.reset();
-        phase = sinceTick = 0.0;
-        pending = 0;
     }
 
     // One tick of the grid: generator, CLOCK, ACCENT and tempo-light pulses; R and R' too in GRID mode.
@@ -90,11 +81,7 @@ struct Ripple : Module
         if (playPressed || playTrigged)
         {
             play = ! play;
-            if (play)
-            {
-                if (pulses < 2) pulses = 0;
-                else skipMeasure = true;
-            }
+            if (play) clock.resume();
         }
         const bool resetPressed = resetBtn.process (params[RESET_PARAM].getValue() > 0.f);
         const bool resetTrigged = resetTrig.process (inputs[RESET_INPUT].getVoltage(), 0.1f, 1.f);
@@ -111,64 +98,19 @@ struct Ripple : Module
         const int density = (int) std::round (params[DENSITY_PARAM].getValue());
         const bool wave = params[MODE_PARAM].getValue() > 0.5f;
 
-        // the clock: EXT edges when patched, else the internal tempo. frac = position inside the current tick.
-        float frac = 0.f;
-        if (inputs[EXT_INPUT].isConnected())
-        {
-            const bool edge = extTrig.process (inputs[EXT_INPUT].getVoltage(), 0.1f, 1.f);
-            if (play)
-            {
-                sinceTick += dt;
-                sincePulse += dt;
-            }
-            if (edge && play)
-            {
-                if (pulses < 2) ++pulses;
-                if (pulses == 2 && ! skipMeasure) tickLen = extPerBeat ? sincePulse / 4.0 : sincePulse;
-                skipMeasure = false;
-                sincePulse = sinceTick = 0.0;
-                fire (extPerBeat ? counter.nextBeat() : counter.next(), period, on, density, wave);
-                pending = extPerBeat ? 3 : 0;
-            }
-            else if (extPerBeat && play && pending > 0 && pulses == 2 && sinceTick >= tickLen)
-            {
-                sinceTick -= tickLen;
-                --pending;
-                fire (counter.next(), period, on, density, wave);
-            }
-            if (pulses == 2 && ! counter.armed) frac = (float) std::min (sinceTick / tickLen, 0.999);
-            phase = frac;   // the internal clock continues from where EXT left off, so T does not jump
-        }
-        else
-        {
-            pulses = 0;   // EXT unpatched: the next patch re-measures its interval from two fresh pulses
-            if (play)
-            {
-                if (counter.armed)   // power-on or RESET: the downbeat plays at once
-                {
-                    phase = 0.0;
-                    fire (counter.next(), period, on, density, wave);
-                }
-                else
-                {
-                    const float bpm = clamp (params[TEMPO_PARAM].getValue() * std::pow (2.f, scale::clampV (inputs[TEMPO_INPUT].getVoltage())), 10.f, 1000.f);
-                    phase += bpm * 4.0 / 60.0 * dt;
-                    if (phase >= 1.0)
-                    {
-                        phase -= 1.0;
-                        fire (counter.next(), period, on, density, wave);
-                    }
-                }
-            }
-            frac = (float) phase;
-        }
+        // the clock: EXT edges when patched, else the internal tempo
+        const bool ext = inputs[EXT_INPUT].isConnected();
+        const bool edge = extTrig.process (inputs[EXT_INPUT].getVoltage(), 0.1f, 1.f);
+        const float bpm = clamp (params[TEMPO_PARAM].getValue() * std::pow (2.f, scale::clampV (inputs[TEMPO_INPUT].getVoltage())), 10.f, 1000.f);
+        uint32_t tick = 0;
+        if (clock.process (dt, bpm, ext, edge, play, extPerBeat, tick)) fire (tick, period, on, density, wave);
 
         // WAVE: track the sum every sample (so resuming does not glitch); fire only in WAVE mode while playing.
         // While armed the downbeat has not played yet, so there is nothing to track.
-        if (! counter.armed)
+        if (! clock.counter.armed)
         {
             bool wr = false, wrp = false;
-            cross.process (rhythm::waveSum (counter.t + (double) frac, period, on), rhythm::threshold (density), on != 0, wr, wrp);
+            cross.process (rhythm::waveSum (clock.counter.t + (double) clock.frac, period, on), rhythm::threshold (density), on != 0, wr, wrp);
             if (wave && play)
             {
                 if (wr) rPulse.trigger (1e-3f);
@@ -203,7 +145,7 @@ struct Ripple : Module
         play = true;
         extPerBeat = clockBeats = false;
         restart();
-        if (pulses == 2) skipMeasure = true; else pulses = 0;   // Initialize resumes play: same rule as pressing PLAY
+        clock.resume();   // Initialize resumes play: same rule as pressing PLAY
     }
 
     json_t* dataToJson() override
@@ -220,6 +162,8 @@ struct Ripple : Module
         if (json_t* j = json_object_get (root, "play")) play = json_boolean_value (j);
         if (json_t* j = json_object_get (root, "extPerBeat")) extPerBeat = json_boolean_value (j);
         if (json_t* j = json_object_get (root, "clockBeats")) clockBeats = json_boolean_value (j);
+        restart();   // a preset or patch load starts at an armed downbeat, like Initialize
+        clock.resume();
     }
 };
 
