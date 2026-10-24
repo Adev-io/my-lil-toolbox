@@ -24,7 +24,7 @@ void check (bool ok, const char* what, double got = 0.0)
 bool near (double a, double b, double tol = 1e-5) { return std::abs (a - b) <= tol; }
 uint16_t maskOf (std::initializer_list<int> pcs) { uint16_t m = 0; for (int p : pcs) m |= (uint16_t) (1u << p); return m; }
 typedef std::vector<std::pair<int, uint32_t>> Ticks;   // (sample index, tick number)
-const double clockDt = 1.0 / 1024;   // a power of two: 120 BPM is exactly 128 samples per tick, EXT intervals are exact
+const double clockDt = 1.0 / 1024;   // a power of two: 120 BPM is exactly 128 samples per tick and EXT intervals are exact (120 BPM only: under -funsafe-math-optimizations other tempos may round)
 
 // Advances the clock n samples. EXT edges fire on the sample indexes in `edges` (relative to this run). Appends every
 // tick played as (sample, tick) to `out` and returns how many this run played.
@@ -567,6 +567,30 @@ void testRhythmClock()
         Ticks after;
         runClock (c, 50, true, { 0 }, true, false, after);
         check (sameTicks (after, { { 0, 0 } }) && c.counter.t == 0, "clock: RESET on EXT makes the next edge play tick 0", c.counter.t);
+    }
+    {   // 11. resume after a single edge: the stop forgets that edge, so the next edge counts as the first again
+        rhythm::Clock c;
+        Ticks t;
+        runClock (c, 50, true, { 0 }, true, false, t);   // one edge: pulses 1
+        Ticks stopped;
+        runClock (c, 100, true, {}, false, false, stopped);
+        c.resume();   // pulses < 2: back to 0
+        Ticks b;
+        runClock (c, 60, true, { 0 }, true, false, b);   // first edge again: no interval measured, frac stays 0
+        check (sameTicks (b, { { 0, 1 } }) && c.frac == 0.f, "clock: resume after one edge restarts the interval measurement (frac stays 0)", c.frac);
+    }
+    {   // 12. unpatching EXT forgets the measured interval; re-patching measures it again from two fresh pulses
+        rhythm::Clock c;
+        Ticks t;
+        runClock (c, 150, true, { 0, 100 }, true, false, t);   // tickLen 100 samples
+        Ticks internal;
+        runClock (c, 10, false, {}, true, false, internal);   // unpatched for 10 samples: no tick, pulses back to 0
+        Ticks c1;
+        runClock (c, 50, true, { 0 }, true, false, c1);   // first fresh pulse: tick 2, frac 0 while waiting for the second
+        const bool waiting = sameTicks (c1, { { 0, 2 } }) && c.frac == 0.f;
+        Ticks c2;
+        runClock (c, 30, true, { 0 }, true, false, c2);   // second: tickLen is now 50 samples, so 29 samples later frac = 0.58
+        check (internal.empty() && waiting && sameTicks (c2, { { 0, 3 } }) && near (c.frac, 0.58), "clock: re-patched EXT measures a fresh interval (frac 0, then 29/50)", c.frac);
     }
 }
 // ---- tests (each task adds its functions above this line)

@@ -95,9 +95,9 @@ struct Counter
 struct Clock
 {
     Counter counter;
-    float frac = 0.f;          // 0..1 (capped at 0.999 on EXT, so it holds just short of the next tick)
+    float frac = 0.f;          // position inside the current tick, 0..1. EXT: 0 until two pulses are in or while armed, then capped at 0.999
     double phase = 0.0;        // internal clock: position inside the current tick, 0..1
-    double sinceTick = 0.0;    // EXT: seconds since the last tick played
+    double sinceTick = 0.0;    // EXT: seconds since the last tick was due
     double sincePulse = 0.0;   // EXT: seconds since the last pulse
     double tickLen = 0.125;    // EXT: measured seconds per tick
     int pulses = 0;            // EXT pulses seen, counting up to 2 (two measure tickLen)
