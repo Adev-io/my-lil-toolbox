@@ -171,7 +171,7 @@ def reach(kind):
 
 
 def rowmax_of(layout):
-    """Each row's biggest non-output part: labels in a row share one baseline set by it."""
+    """Each row's biggest part other than outputs, lights and keys: labels in a row share one baseline set by it."""
     rowmax = {}
     for _, kind, x, y, _ in layout:
         if kind not in ('out', 'light', 'key'):
@@ -212,7 +212,7 @@ def boxes_hit(a, b):
 
 def problems(layout, title, zone_y):
     """Everything on the panel that touches something else or leaves the panel: parts (rings and plates included),
-    their labels, the band's title and face, Rack's four screws. Parts below the jack zone's top (zone_y) must stay
+    their labels, the band's title and face, Rack's four screws. Parts that reach below the jack zone's top (zone_y) must stay
     inside the zone's side margin. Must be empty. Captions are extras and not checked."""
     bad = []
     parts = [(n, x, y, reach(k)) for n, k, x, y, _ in layout]
@@ -228,7 +228,7 @@ def problems(layout, title, zone_y):
                 bad.append('%s touches %s' % (a, b))
         if ax - ar < 0 or ax + ar > W or ay - ar < BAND or ay + ar > H:
             bad.append('%s leaves the panel or enters the band' % a)
-        if ay > zone_y and (ax - ar < ZONE_X or ax + ar > W - ZONE_X):
+        if ay + ar > zone_y and (ax - ar < ZONE_X or ax + ar > W - ZONE_X):
             bad.append('%s leaves the jack zone' % a)
         for name, box in labels:
             if name != a + ' label' and box_hits_circle(box, ax, ay, ar):
