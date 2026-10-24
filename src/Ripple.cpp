@@ -1,4 +1,4 @@
-// Ripple.cpp: the Rack module. Runs the clock (internal or EXT), PLAY and RESET, and fires pulses. Every rhythm
+// Ripple.cpp: the Rack module. Drives the clock (core/Rhythm.h Clock), PLAY and RESET, and fires pulses. Every rhythm
 // decision (which generators hit, R and R', ACCENT, the wave crossings) comes from core/Rhythm.h.
 // Author: Ari Klopfer / A_Development · MIT
 #include "plugin.hpp"
@@ -100,7 +100,7 @@ struct Ripple : Module
 
         // the clock: EXT edges when patched, else the internal tempo
         const bool ext = inputs[EXT_INPUT].isConnected();
-        const bool edge = extTrig.process (inputs[EXT_INPUT].getVoltage(), 0.1f, 1.f);
+        const bool edge = ext && extTrig.process (inputs[EXT_INPUT].getVoltage(), 0.1f, 1.f);   // the trigger only runs while patched, as before
         const float bpm = clamp (params[TEMPO_PARAM].getValue() * std::pow (2.f, scale::clampV (inputs[TEMPO_INPUT].getVoltage())), 10.f, 1000.f);
         uint32_t tick = 0;
         if (clock.process (dt, bpm, ext, edge, play, extPerBeat, tick)) fire (tick, period, on, density, wave);
