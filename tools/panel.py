@@ -56,7 +56,7 @@ def text(s, x, y, size, fill, anchor='middle', stroke=0.0):
 
 # ---- the title band, shared by every module: Rack's screws sit in its corners (5.08 mm squares at x 5.08 and
 # W - 10.16), so the title starts right of the left one and the face sits left of the right one
-TITLE_X = 11.2
+TITLE_X, TITLE_Y, TITLE_SIZE = 11.2, 6.3, 4.3
 MASCOT_X = W - 14.46   # 46.5 on 12 HP
 MASCOT_R = BAND * 0.36
 
@@ -76,12 +76,12 @@ def mascot(cx, cy, r):
 def band(title):
     """The band's art: lime strip, the title at the left, the face at the right."""
     return ['<rect width="%g" height="%g" fill="%s"/>' % (W, BAND, LIME),
-            text(title, TITLE_X, 6.3, 4.3, INK, 'start', 0.39), mascot(MASCOT_X, BAND / 2, MASCOT_R)]
+            text(title, TITLE_X, TITLE_Y, TITLE_SIZE, INK, 'start', 0.39), mascot(MASCOT_X, BAND / 2, MASCOT_R)]
 
 
 def band_boxes(title):
     """Where the title and the face are, as (x0, y0, x1, y1), for the panel check."""
-    return [('title', (TITLE_X, 6.3 - 0.73 * 4.3, TITLE_X + width(title, 4.3), 6.3)),
+    return [('title', (TITLE_X, TITLE_Y - 0.73 * TITLE_SIZE, TITLE_X + width(title, TITLE_SIZE), TITLE_Y)),
             ('mascot', (MASCOT_X - MASCOT_R, BAND / 2 - MASCOT_R, MASCOT_X + MASCOT_R, BAND / 2 + MASCOT_R))]
 
 
@@ -114,10 +114,14 @@ ARPEGGIO = [('KEY%d_PARAM' % pc, 'key', x, y, '') for pc, (x, y) in sorted(KEYS.
 ]
 
 
+ZONE_X = 2.5   # the jack zones' side margin; parts below a zone's top stay inside it
+ARPEGGIO_ZONE_Y = 94.5
+
+
 def arpeggio_extras():
     return [
         '<rect x="2.5" y="14.6" width="%g" height="18.4" rx="1.5" fill="none" stroke="%s" stroke-width="0.5"/>' % (W - 5, LIME),
-        '<rect x="2.5" y="94.5" width="%g" height="29.2" rx="2" fill="%s"/>' % (W - 5, INK2),   # jack zone
+        '<rect x="%g" y="%g" width="%g" height="29.2" rx="2" fill="%s"/>' % (ZONE_X, ARPEGGIO_ZONE_Y, W - 2 * ZONE_X, INK2),   # jack zone
         text('A', (JX[0] + JX[1]) / 2, 98.4, 2.8, LIME, stroke=0.2), text('B', (JX[3] + JX[4]) / 2, 98.4, 2.8, LIME, stroke=0.2),
     ]
 
@@ -128,6 +132,7 @@ def arpeggio_extras():
 GX = (10.5, 24.5, 38.5, 52.5)   # generator columns A-D, 14 mm apart (plate D stays inside the jack zone); DENSITY and MODE share column D
 ROW_PERIOD, ROW_ON, ROW_CV = 62.0, 75.0, 86.0
 OUT_X = (GX[0] + GX[3]) / 2   # the OUT header sits over the middle of the generator grid
+RIPPLE_ZONE_Y = 95.0
 RIPPLE = [
     ('TEMPO_PARAM', 'hero', 12.0, 25.0, 'TEMPO'), ('TEMPO_LIGHT', 'light', 22.5, 17.5, ''),
     ('TEMPO_INPUT', 'cv', 27.0, 29.5, 'CV'), ('EXT_INPUT', 'seq', 38.5, 29.5, 'EXT'),
@@ -150,25 +155,98 @@ def caption(s, y):
 
 def ripple_extras():
     return [
-        '<rect x="2.5" y="95" width="%g" height="28.7" rx="2" fill="%s"/>' % (W - 5, INK2),   # jack zone
-        '<rect x="2.5" y="93.1" width="%g" height="0.5" fill="%s"/>' % (W - 5, MAGENTA),      # OUT header, as Acid Bass's PLAY
+        '<rect x="%g" y="%g" width="%g" height="28.7" rx="2" fill="%s"/>' % (ZONE_X, RIPPLE_ZONE_Y, W - 2 * ZONE_X, INK2),   # jack zone, bottom at 123.7 like Arpeggio's
+        '<rect x="%g" y="93.1" width="%g" height="0.5" fill="%s"/>' % (ZONE_X, W - 2 * ZONE_X, MAGENTA),      # OUT header, as Acid Bass's PLAY
         '<rect x="%g" y="91.5" width="11" height="4.2" fill="%s"/>' % (OUT_X - 5.5, INK),
         text('OUT', OUT_X, 94.6, 3.0, MAGENTA, stroke=0.2),
         caption('PERIOD', ROW_PERIOD), caption('ON', ROW_ON), caption('CV', ROW_CV),
     ]
 
 
-MODULES = {'Arpeggio': ('ARPEGGIO', ARPEGGIO, arpeggio_extras), 'Ripple': ('RIPPLE', RIPPLE, ripple_extras)}
+MODULES = {'Arpeggio': ('ARPEGGIO', ARPEGGIO, arpeggio_extras, ARPEGGIO_ZONE_Y), 'Ripple': ('RIPPLE', RIPPLE, ripple_extras, RIPPLE_ZONE_Y)}
 
 
 def reach(kind):
     return RING_R if kind in RING_COLOR else PAD_R if kind == 'out' else RADIUS[kind]
 
 
-def overlaps(layout):
-    """Pairs of parts whose outlines (input rings and output plates included) touch. Must be empty."""
-    return [(a[0], b[0]) for j, a in enumerate(layout) for b in layout[j + 1:]
-            if math.hypot(a[2] - b[2], a[3] - b[3]) < reach(a[1]) + reach(b[1])]
+def rowmax_of(layout):
+    """Each row's biggest non-output part: labels in a row share one baseline set by it."""
+    rowmax = {}
+    for _, kind, x, y, _ in layout:
+        if kind not in ('out', 'light', 'key'):
+            rowmax[y] = max(rowmax.get(y, 0), reach(kind))
+    return rowmax
+
+
+def label_at(kind, y, rowmax):
+    """Baseline, size, colour and stroke of the label under a part of this kind in this row."""
+    if kind == 'light':
+        return y + RADIUS['light'] + 2.6, LABEL_SIZE[kind], DIM, 0.0
+    r = PAD_R if kind == 'out' else rowmax[y]
+    colour, stroke = (LIME, 0.3) if kind == 'hero' else (LIME, 0.25) if kind == 'out' else (WHITE, 0.18)
+    return y + r + 2.8 + (0.4 if kind == 'hero' else 0), LABEL_SIZE[kind], colour, stroke
+
+
+def label_box(x, base, size, label):
+    """(x0, y0, x1, y1) of a centred label: cap height 0.73 em above the baseline."""
+    w = width(label, size)
+    return x - w / 2, base - 0.73 * size, x + w / 2, base
+
+
+SCREW = 5.08   # Rack's ScrewBlack: 5.08 mm squares at (5.08, 0), (W - 10.16, 0) and the same two at the bottom edge
+
+
+def screws():
+    return [(x, y, x + SCREW, y + SCREW) for x in (SCREW, W - 2 * SCREW) for y in (0, H - SCREW)]
+
+
+def box_hits_circle(b, cx, cy, r):
+    nx, ny = min(max(cx, b[0]), b[2]), min(max(cy, b[1]), b[3])   # the box's nearest point to the centre
+    return math.hypot(cx - nx, cy - ny) < r
+
+
+def boxes_hit(a, b):
+    return a[0] < b[2] and b[0] < a[2] and a[1] < b[3] and b[1] < a[3]
+
+
+def problems(layout, title, zone_y):
+    """Everything on the panel that touches something else or leaves the panel: parts (rings and plates included),
+    their labels, the band's title and face, Rack's four screws. Parts below the jack zone's top (zone_y) must stay
+    inside the zone's side margin. Must be empty. Captions are extras and not checked."""
+    bad = []
+    parts = [(n, x, y, reach(k)) for n, k, x, y, _ in layout]
+    rowmax = rowmax_of(layout)
+    labels = []
+    for n, k, x, y, label in layout:
+        if label:
+            base, size, _, _ = label_at(k, y, rowmax)
+            labels.append((n + ' label', label_box(x, base, size, label)))
+    for j, (a, ax, ay, ar) in enumerate(parts):
+        for b, bx, by, br in parts[j + 1:]:
+            if math.hypot(ax - bx, ay - by) < ar + br:
+                bad.append('%s touches %s' % (a, b))
+        if ax - ar < 0 or ax + ar > W or ay - ar < BAND or ay + ar > H:
+            bad.append('%s leaves the panel or enters the band' % a)
+        if ay > zone_y and (ax - ar < ZONE_X or ax + ar > W - ZONE_X):
+            bad.append('%s leaves the jack zone' % a)
+        for name, box in labels:
+            if name != a + ' label' and box_hits_circle(box, ax, ay, ar):
+                bad.append('%s covers %s' % (a, name))
+        for s in screws():
+            if box_hits_circle(s, ax, ay, ar):
+                bad.append('%s under a screw' % a)
+    boxes = labels + band_boxes(title)
+    for j, (a, box) in enumerate(boxes):
+        if box[0] < 0 or box[2] > W or box[3] > H:
+            bad.append('%s leaves the panel' % a)
+        for b, other in boxes[j + 1:]:
+            if boxes_hit(box, other):
+                bad.append('%s overlaps %s' % (a, b))
+        for s in screws():
+            if boxes_hit(box, s):
+                bad.append('%s under a screw' % a)
+    return bad
 
 
 def panel(title, layout, extras):
@@ -179,23 +257,15 @@ def panel(title, layout, extras):
     ] + band(title) + [
         text('my lil toolbox', W / 2, 12.6, 2.4, WHITE, stroke=0.12),
     ] + extras()
-    rowmax = {}   # labels in a row share one baseline, set by the row's biggest part
-    for _, kind, x, y, _ in layout:
-        if kind not in ('out', 'light', 'key'):
-            rowmax[y] = max(rowmax.get(y, 0), RING_R if kind in RING_COLOR else RADIUS[kind])
+    rowmax = rowmax_of(layout)
     for _, kind, x, y, label in layout:
         if kind in RING_COLOR:
             out.append('<circle cx="%g" cy="%g" r="%g" fill="none" stroke="%s" stroke-width="0.5"/>' % (x, y, RING_R, RING_COLOR[kind]))
         elif kind == 'out':
             out.append('<circle cx="%g" cy="%g" r="%g" fill="%s" stroke="%s" stroke-width="0.5"/>' % (x, y, PAD_R, INK, LIME))
-        if not label:
-            continue
-        if kind == 'light':
-            out.append(text(label, x, y + RADIUS['light'] + 2.6, LABEL_SIZE[kind], DIM))
-            continue
-        r = PAD_R if kind == 'out' else rowmax[y]
-        colour, stroke = (LIME, 0.3) if kind == 'hero' else (LIME, 0.25) if kind == 'out' else (WHITE, 0.18)
-        out.append(text(label, x, y + r + 2.8 + (0.4 if kind == 'hero' else 0), LABEL_SIZE[kind], colour, stroke=stroke))
+        if label:
+            base, size, colour, stroke = label_at(kind, y, rowmax)
+            out.append(text(label, x, base, size, colour, stroke=stroke))
     out.append(text('A_DEVELOPMENT', W / 2, 126.4, 2.4, DIM))
     out.append('</svg>')
     return '\n'.join(out) + '\n'
@@ -204,7 +274,7 @@ def panel(title, layout, extras):
 def header():
     lines = ['// layout.hpp: generated by tools/panel.py, do not edit. Component centres in mm.', '#pragma once',
              'namespace layout {']
-    for name, (_, layout, _) in MODULES.items():
+    for name, (_, layout, _, _) in MODULES.items():
         lines += ['namespace %s {' % name.lower()]
         lines += ['constexpr float %s[2] = {%.2ff, %.2ff};' % (i, x, y) for i, _, x, y, _ in layout]
         lines += ['}']
@@ -213,10 +283,10 @@ def header():
 
 
 if __name__ == '__main__':
-    for name, (_, layout, _) in MODULES.items():
-        bad = overlaps(layout)
-        assert not bad, '%s: overlapping parts %s' % (name, bad)
-    files = {os.path.join('res', name + '.svg'): panel(*spec) for name, spec in MODULES.items()}
+    for name, (title, layout, _, zone_y) in MODULES.items():
+        bad = problems(layout, title, zone_y)
+        assert not bad, '%s: %s' % (name, '; '.join(bad))
+    files = {os.path.join('res', name + '.svg'): panel(*spec[:3]) for name, spec in MODULES.items()}
     files[os.path.join('src', 'layout.hpp')] = header()
     for rel, body in files.items():
         with open(os.path.join(ROOT, rel), 'w', encoding='utf-8') as f:
