@@ -5,6 +5,7 @@
 #include "layout.hpp"
 #include "Scale.h"
 #include "Rhythm.h"
+#include "TalkingFace.hpp"
 
 struct Ripple : Module
 {
@@ -19,6 +20,7 @@ struct Ripple : Module
     dsp::BooleanTrigger playBtn, resetBtn;
     dsp::PulseGenerator genPulse[4], clockPulse, rPulse, rpPulse, accentPulse, tempoPulse;
     dsp::ClockDivider lightDiv;
+    FaceTap face;   // the mascot's mouth
     bool play = true;
     bool extPerBeat = false;   // context menu: EXT is 1 pulse per beat (else per 16th)
     bool clockBeats = false;   // context menu: CLOCK out fires on beats (else 16ths)
@@ -124,6 +126,9 @@ struct Ripple : Module
         outputs[R_OUTPUT].setVoltage (rPulse.process (st) ? 10.f : 0.f);
         outputs[RP_OUTPUT].setVoltage (rpPulse.process (st) ? 10.f : 0.f);
         outputs[ACCENT_OUTPUT].setVoltage (accentPulse.process (st) ? 10.f : 0.f);
+        float faceSum = outputs[R_OUTPUT].getVoltage();
+        for (int i = 0; i < 4; ++i) faceSum += outputs[GEN_OUTPUT + i].getVoltage();
+        face.push (clamp (faceSum / 20.f, 0.f, 1.f), args.sampleRate);
         tempoOn = tempoPulse.process (st);
 
         if (lightDiv.process()) setLights (on, wave);
@@ -173,6 +178,11 @@ struct RippleWidget : ModuleWidget
     {
         setModule (module);
         setPanel (createPanel (asset::plugin (pluginInstance, "res/Ripple.svg")));
+        {
+            namespace L = layout::ripple;
+            TalkingFace* f = createWidget<TalkingFace> (mm2px (Vec (L::FACE[0] - L::FACE[2], L::FACE[1] - L::FACE[2])));
+            f->box.size = mm2px (Vec (2 * L::FACE[2], 2 * L::FACE[2])); if (module) f->tap = &module->face; addChild (f);
+        }
         addChild (createWidget<ScrewBlack> (Vec (RACK_GRID_WIDTH, 0)));
         addChild (createWidget<ScrewBlack> (Vec (box.size.x - 2 * RACK_GRID_WIDTH, 0)));
         addChild (createWidget<ScrewBlack> (Vec (RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));

@@ -277,6 +277,7 @@ def header():
     for name, (_, layout, _, _) in MODULES.items():
         lines += ['namespace %s {' % name.lower()]
         lines += ['constexpr float %s[2] = {%.2ff, %.2ff};' % (i, x, y) for i, _, x, y, _ in layout]
+        lines += ['constexpr float FACE[3] = {%.2ff, %.2ff, %.3ff};   // mascot centre x, y, radius (TalkingFace)' % (MASCOT_X, BAND / 2, MASCOT_R)]
         lines += ['}']
     lines += ['}', '']
     return '\n'.join(lines)

@@ -4,6 +4,7 @@
 #include "plugin.hpp"
 #include "layout.hpp"
 #include "Section.h"
+#include "TalkingFace.hpp"
 
 struct Arpeggio : Module
 {
@@ -19,6 +20,7 @@ struct Arpeggio : Module
     dsp::BooleanTrigger randBtn, dirBtn;
     dsp::PulseGenerator pulseA, pulseB;
     dsp::ClockDivider lightDiv;
+    FaceTap face;   // the mascot's mouth
     int lastType = -1;   // TYPE index whose preset the keys last loaded; -1 = load on the next sample
     int typeSettle = 0;   // samples to ignore TYPE after a patch load: cables read 0 V until upstream modules run
     int dir = arp::UP;
@@ -107,6 +109,7 @@ struct Arpeggio : Module
         outputs[B_CV_OUTPUT].setVoltage (ob.volts);
         outputs[A_TRIG_OUTPUT].setVoltage (pulseA.process (args.sampleTime) ? 10.f : 0.f);
         outputs[B_TRIG_OUTPUT].setVoltage (pulseB.process (args.sampleTime) ? 10.f : 0.f);
+        face.push (clamp ((outputs[A_CV_OUTPUT].getVoltage() + outputs[B_CV_OUTPUT].getVoltage()) / 4.f, -1.f, 1.f), args.sampleRate);
 
         if (lightDiv.process()) setLights (mask, oa.pc, ob.pc, s.arpMode);
     }
@@ -161,6 +164,11 @@ struct ArpeggioWidget : ModuleWidget
     {
         setModule (module);
         setPanel (createPanel (asset::plugin (pluginInstance, "res/Arpeggio.svg")));
+        {
+            namespace L = layout::arpeggio;
+            TalkingFace* f = createWidget<TalkingFace> (mm2px (Vec (L::FACE[0] - L::FACE[2], L::FACE[1] - L::FACE[2])));
+            f->box.size = mm2px (Vec (2 * L::FACE[2], 2 * L::FACE[2])); if (module) f->tap = &module->face; addChild (f);
+        }
         addChild (createWidget<ScrewBlack> (Vec (RACK_GRID_WIDTH, 0)));
         addChild (createWidget<ScrewBlack> (Vec (box.size.x - 2 * RACK_GRID_WIDTH, 0)));
         addChild (createWidget<ScrewBlack> (Vec (RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));

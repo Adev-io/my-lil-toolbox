@@ -38,6 +38,7 @@ constexpr float A_CV_OUTPUT[2] = {8.48f, 115.30f};
 constexpr float A_TRIG_OUTPUT[2] = {19.48f, 115.30f};
 constexpr float B_CV_OUTPUT[2] = {41.48f, 115.30f};
 constexpr float B_TRIG_OUTPUT[2] = {52.48f, 115.30f};
+constexpr float FACE[3] = {46.50f, 4.30f, 3.096f};   // mascot centre x, y, radius (TalkingFace)
 }
 namespace ripple {
 constexpr float TEMPO_PARAM[2] = {12.00f, 25.00f};
@@ -70,5 +71,6 @@ constexpr float CLOCK_OUTPUT[2] = {10.50f, 115.30f};
 constexpr float R_OUTPUT[2] = {24.50f, 115.30f};
 constexpr float RP_OUTPUT[2] = {38.50f, 115.30f};
 constexpr float ACCENT_OUTPUT[2] = {52.50f, 115.30f};
+constexpr float FACE[3] = {46.50f, 4.30f, 3.096f};   // mascot centre x, y, radius (TalkingFace)
 }
 }
