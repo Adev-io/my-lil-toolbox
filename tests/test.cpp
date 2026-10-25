@@ -1,4 +1,4 @@
-// test.cpp: checks the core (scale, arp, section, rhythm) with plain asserts. Run: make test
+// test.cpp: checks the core (scale, arp, section, rhythm, gate, ladder) with plain asserts. Run: make test
 // Author: Ari Klopfer / A_Development · MIT
 #include "Scale.h"
 #include "Arp.h"
@@ -6,6 +6,8 @@
 #include "Rhythm.h"
 #include "FaceTap.h"
 #include "Gate.h"
+#include "Ladder.h"
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
@@ -661,6 +663,96 @@ void testGate()
         check (highOnly (runGate (g, 100, { 0 }), 0, 10), "gate: after reset the first trig gives 10 ms again");
     }
 }
+// Peak output of a sine through a fresh filter: 0.5 s to settle, then the peak of the next 0.25 s. 44.1 kHz.
+const double ladderSr = 44100.0;
+double ladderPeak (float hz, float volts, float cutoffHz, float res, float drive)
+{
+    ladder::Ladder f;
+    f.prepare (ladderSr);
+    f.set (cutoffHz, res, drive);
+    double peak = 0.0;
+    const int settle = (int) (0.5 * ladderSr), n = settle + (int) (0.25 * ladderSr);
+    for (int i = 0; i < n; ++i)
+    {
+        const float y = f.process (volts * (float) std::sin (2.0 * 3.141592653589793 * hz * i / ladderSr));
+        if (i >= settle) peak = std::max (peak, (double) std::fabs (y));
+    }
+    return peak;
+}
+double ladderDb (float hz, float cutoffHz, float res, float drive = 0.f)
+{
+    return 20.0 * std::log10 (ladderPeak (hz, 0.1f, cutoffHz, res, drive) / 0.1);   // 100 mV: well under the output knee
+}
+
+void testLadderResponse()
+{
+    {
+        ladder::Ladder f;
+        f.prepare (ladderSr);
+        f.set (100.f, 0.f, 0.f);
+        float y = 0.f;
+        for (int i = 0; i < (int) ladderSr; ++i) y = f.process (1.f);
+        check (near (y, 1.0, 1e-3), "ladder: 1 V DC passes at a 100 Hz cutoff", y);
+    }
+    const double lo = ladderDb (50.f, 8000.f, 0.f);
+    check (std::abs (lo) < 0.1, "ladder: drive 0, res 0: a 50 Hz tone passes at unity (dB)", lo);
+    const double at2 = ladderDb (2000.f, 500.f, 0.f), at4 = ladderDb (4000.f, 500.f, 0.f), at15 = ladderDb (1414.f, 500.f, 0.f);
+    std::printf ("      ladder measured: 500 Hz cutoff: 1414 Hz %.1f dB, 2 kHz %.1f dB, 4 kHz %.1f dB, slope 2-4 kHz %.1f dB/oct\n", at15, at2, at4, at4 - at2);
+    check (at15 < -30.0, "ladder: 1.5 octaves above cutoff is more than 30 dB down", at15);
+    check (at4 - at2 < -21.0 && at4 - at2 > -27.0, "ladder: about 24 dB per octave above cutoff (dB/oct)", at4 - at2);
+    const double flat = ladderDb (1000.f, 1000.f, 0.f), peaked = ladderDb (1000.f, 1000.f, 1.f), half = ladderDb (1000.f, 1000.f, 0.5f);
+    std::printf ("      ladder measured: gain at cutoff (1 kHz): res 0 %.1f dB, res 0.5 %.1f dB, res 1 %.1f dB\n", flat, half, peaked);
+    check (half > flat + 15.0 && peaked > half + 5.0, "ladder: resonance raises the gain at cutoff (res 1 vs 0, dB)", peaked - flat);   // measured +19.5, then +7.4
+    const double d1 = 20.0 * std::log10 (ladderPeak (100.f, 5.f, 8000.f, 0.f, 1.f) / 5.0);
+    check (std::abs (d1) < 1.0, "ladder: full drive keeps a 5 V peak near 5 V (dB)", d1);
+    const double small0 = ladderDb (100.f, 8000.f, 0.f, 0.f), small1 = 20.0 * std::log10 (ladderPeak (100.f, 0.05f, 8000.f, 0.f, 1.f) / 0.05);
+    check (small1 > small0 + 12.0, "ladder: drive lifts quiet signals (dB at 50 mV, drive 1)", small1);
+}
+
+void testLadderSafety()
+{
+    ladder::Ladder f;
+    f.prepare (ladderSr);
+    f.set (1000.f, 1.f, 1.f);
+    bool bounded = true;
+    for (int i = 0; i < 20000; ++i)
+    {
+        const float y = f.process ((i / 20) % 2 ? 1e6f : -1e6f);
+        bounded = bounded && y == y && std::fabs (y) <= 10.f;
+    }
+    check (bounded, "ladder: +-1e6 V square at full res and drive stays finite and within 10 V");
+    const float n = f.process (std::nanf (""));
+    float after = 0.f;
+    for (int i = 0; i < 100; ++i) after = f.process (0.5f);
+    check (n == n && after == after && std::fabs (after) <= 10.f, "ladder: a NaN input does not poison the state", after);
+    f.set (std::nanf (""), std::nanf (""), std::nanf (""));
+    const float bad = f.process (1.f);
+    check (bad == bad && std::fabs (bad) <= 10.f, "ladder: NaN settings are ignored", bad);
+
+    f.reset();
+    bool zero = true;
+    for (int i = 0; i < 64; ++i) zero = zero && f.process (0.f) == 0.f;
+    check (zero, "ladder: reset clears the state (silence in, silence out)");
+
+    ladder::Ladder s;
+    s.prepare (ladderSr);
+    scale::Rng rng (5);
+    bool stable = true;
+    float peak = 0.f;
+    for (int i = 0; i < (int) (2 * ladderSr); ++i)
+    {
+        const float hz = 60.f * std::pow (2.f, 10.f * (float) i / (float) (2 * ladderSr));   // 60 Hz .. 61 kHz, clamped at 0.45 * sr
+        if (i % 4 == 0) s.set (hz, 1.f, 0.5f);
+        const float y = s.process (10.f * ((float) (rng.next() % 2001) / 1000.f - 1.f));
+        stable = stable && y == y && std::fabs (y) <= 10.f;
+        peak = std::max (peak, std::fabs (y));
+    }
+    check (stable && peak > 0.1f, "ladder: noise through a sweep to Nyquist at full res stays finite and within 10 V", peak);
+    s.set (1e9f, 1.f, 0.f);
+    float top = 0.f;
+    for (int i = 0; i < 1000; ++i) top = s.process (i % 2 ? 5.f : -5.f);
+    check (top == top && std::fabs (top) <= 10.f, "ladder: a cutoff far above Nyquist clamps", top);
+}
 // ---- tests (each task adds its functions above this line)
 }
 
@@ -711,6 +803,8 @@ int main()
     testRhythmWave();
     testRhythmClock();
     testGate();
+    testLadderResponse();
+    testLadderSafety();
     // ---- calls (each task adds its calls above this line)
     std::printf ("\n%s: %d failure(s)\n", failures ? "FAILED" : "PASSED", failures);
     return failures ? 1 : 0;
