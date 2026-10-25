@@ -59,6 +59,15 @@ def text(s, x, y, size, fill, anchor='middle', stroke=0.0):
 TITLE_X, TITLE_Y, TITLE_SIZE = 11.2, 6.3, 4.3
 MASCOT_X = W - 14.46   # 46.5 on 12 HP
 MASCOT_R = BAND * 0.36
+HP = {'Slider': 18}   # panel width per module, 12 HP unless named here
+NO_CAPTION = {'Slider'}   # modules whose parts sit where the 'my lil toolbox' caption goes
+
+
+def use(name):
+    """Panel globals for this module: width and the face's x (the layout tables below were built at 12 HP and keep it)."""
+    global W, MASCOT_X
+    W = 5.08 * HP.get(name, 12)
+    MASCOT_X = W - 14.46
 
 
 def mascot(cx, cy, r):
@@ -184,8 +193,46 @@ def filter_extras():
     ]
 
 
+# ---- Slider (18 HP): two sections of 8 sliders, a gate button under each; a control strip (A's LEN RNG REC INV REV,
+# CHAIN, B's five) over the jack zone. Built on its own width SW, never the global W.
+SW = 5.08 * 18
+SLIDER_BOX = (6.72, 25.92)   # VCVSlider.svg is 19.84 x 76.54 px at Rack's 75 dpi; handle and light stay inside it
+SX = [SW / 2 + (i - 3.5) * 10.5 for i in range(8)]   # slider columns, 10.5 mm apart
+ROW_SLIDE, ROW_GATE = (23.7, 59.7), (41.5, 77.5)   # per section A, B
+STRIP_X = [SW / 2 + (i - 5) * 7.8 for i in range(11)]
+SIN_X = [SW / 2 + (i - 2.5) * 14.0 for i in range(6)]   # jack columns, 14 mm apart
+SLIDER_ZONE_Y = 95.0
+SLIDER = [part for sec in (0, 1) for i, x in enumerate(SX) for part in (
+    ('SLIDER%d_PARAM' % (sec * 8 + i), 'slider', x, ROW_SLIDE[sec], ''), ('GATE%d_PARAM' % (sec * 8 + i), 'button', x, ROW_GATE[sec], ''))] + [
+    ('%s%d_PARAM' % (n, sec), k, STRIP_X[sec * 6 + j], 88.0, l) for sec in (0, 1)
+    for j, (n, k, l) in enumerate((('LENGTH', 'trim', 'LEN'), ('RANGE', 'trim', 'RNG'), ('REC', 'button', 'REC'),
+                                   ('INVERT', 'button', 'INV'), ('REVERSE', 'button', 'REV')))] + [
+    ('CHAIN_PARAM', 'button', STRIP_X[5], 88.0, 'CHAIN'),
+    ('CLOCK_INPUT', 'seq', SIN_X[0], 102.0, 'CLOCK'), ('RESET_INPUT', 'seq', SIN_X[1], 102.0, 'RESET'),
+    ('A_CV_INPUT', 'cv', SIN_X[2], 102.0, 'CV'), ('A_GATE_INPUT', 'play', SIN_X[3], 102.0, 'GATE'),
+    ('B_CV_INPUT', 'cv', SIN_X[4], 102.0, 'CV'), ('B_GATE_INPUT', 'play', SIN_X[5], 102.0, 'GATE'),
+    ('A_CV_OUTPUT', 'out', SIN_X[2], 115.3, 'CV'), ('A_GATE_OUTPUT', 'out', SIN_X[3], 115.3, 'GATE'),
+    ('B_CV_OUTPUT', 'out', SIN_X[4], 115.3, 'CV'), ('B_GATE_OUTPUT', 'out', SIN_X[5], 115.3, 'GATE'),
+]
+
+
+def slider_box(x, y):
+    w, h = SLIDER_BOX
+    return x - w / 2, y - h / 2, x + w / 2, y + h / 2
+
+
+def slider_extras():
+    slots = ['<rect x="%g" y="%g" width="4.2" height="%g" rx="1" fill="%s"/>' % (x - 2.1, y - SLIDER_BOX[1] / 2, SLIDER_BOX[1], INK2)
+             for _, k, x, y, _ in SLIDER if k == 'slider']   # a lighter slot behind each (black) slider track
+    return slots + [
+        text('A', 2.9, ROW_SLIDE[0] + 1.0, 2.8, LIME, stroke=0.2), text('B', 2.9, ROW_SLIDE[1] + 1.0, 2.8, LIME, stroke=0.2),
+        '<rect x="%g" y="%g" width="%g" height="28.7" rx="2" fill="%s"/>' % (ZONE_X, SLIDER_ZONE_Y, SW - 2 * ZONE_X, INK2),   # jack zone, as Ripple's
+        text('A', (SIN_X[2] + SIN_X[3]) / 2, 98.4, 2.8, LIME, stroke=0.2), text('B', (SIN_X[4] + SIN_X[5]) / 2, 98.4, 2.8, LIME, stroke=0.2),
+    ]
+
+
 MODULES = {'Arpeggio': ('ARPEGGIO', ARPEGGIO, arpeggio_extras, ARPEGGIO_ZONE_Y), 'Ripple': ('RIPPLE', RIPPLE, ripple_extras, RIPPLE_ZONE_Y),
-           'Filter': ('FILTER', FILTER, filter_extras, FILTER_ZONE_Y)}
+           'Filter': ('FILTER', FILTER, filter_extras, FILTER_ZONE_Y), 'Slider': ('SLIDER', SLIDER, slider_extras, SLIDER_ZONE_Y)}
 
 
 def reach(kind):
@@ -193,10 +240,10 @@ def reach(kind):
 
 
 def rowmax_of(layout):
-    """Each row's biggest part other than outputs, lights and keys: labels in a row share one baseline set by it."""
+    """Each row's biggest part other than outputs, lights, keys and sliders: labels in a row share one baseline set by it."""
     rowmax = {}
     for _, kind, x, y, _ in layout:
-        if kind not in ('out', 'light', 'key'):
+        if kind not in ('out', 'light', 'key', 'slider'):
             rowmax[y] = max(rowmax.get(y, 0), reach(kind))
     return rowmax
 
@@ -235,9 +282,15 @@ def boxes_hit(a, b):
 def problems(layout, title, zone_y):
     """Everything on the panel that touches something else or leaves the panel: parts (rings and plates included),
     their labels, the band's title and face, Rack's four screws. Parts that reach below the jack zone's top (zone_y) must stay
-    inside the zone's side margin. Must be empty. Captions are extras and not checked."""
+    inside the zone's side margin. Sliders are boxes (SLIDER_BOX), the rest circles. Must be empty. Captions are extras and not checked."""
     bad = []
-    parts = [(n, x, y, reach(k)) for n, k, x, y, _ in layout]
+    parts = [(n, x, y, reach(k)) for n, k, x, y, _ in layout if k != 'slider']
+    rects = [(n, slider_box(x, y)) for n, k, x, y, _ in layout if k == 'slider']
+    for a, box in rects:
+        if box[1] < BAND:
+            bad.append('%s enters the band' % a)
+        if box[3] > zone_y and (box[0] < ZONE_X or box[2] > W - ZONE_X):
+            bad.append('%s leaves the jack zone' % a)
     rowmax = rowmax_of(layout)
     labels = []
     for n, k, x, y, label in layout:
@@ -255,10 +308,13 @@ def problems(layout, title, zone_y):
         for name, box in labels:
             if name != a + ' label' and box_hits_circle(box, ax, ay, ar):
                 bad.append('%s covers %s' % (a, name))
+        for name, box in rects:
+            if box_hits_circle(box, ax, ay, ar):
+                bad.append('%s touches %s' % (a, name))
         for s in screws():
             if box_hits_circle(s, ax, ay, ar):
                 bad.append('%s under a screw' % a)
-    boxes = labels + band_boxes(title)
+    boxes = labels + band_boxes(title) + rects   # sliders against labels, the band, each other, screws and the panel edges
     for j, (a, box) in enumerate(boxes):
         if box[0] < 0 or box[2] > W or box[3] > H:
             bad.append('%s leaves the panel' % a)
@@ -271,14 +327,14 @@ def problems(layout, title, zone_y):
     return bad
 
 
-def panel(title, layout, extras):
+def panel(title, layout, extras, caption=True):
     out = [
         '<?xml version="1.0" encoding="UTF-8"?>',
         '<svg xmlns="http://www.w3.org/2000/svg" width="%gmm" height="%gmm" viewBox="0 0 %g %g">' % (W, H, W, H),
         '<rect width="%g" height="%g" fill="%s"/>' % (W, H, INK),
-    ] + band(title) + [
+    ] + band(title) + ([
         text('my lil toolbox', W / 2, 12.6, 2.4, WHITE, stroke=0.12),
-    ] + extras()
+    ] if caption else []) + extras()
     rowmax = rowmax_of(layout)
     for _, kind, x, y, label in layout:
         if kind in RING_COLOR:
@@ -297,19 +353,24 @@ def header():
     lines = ['// layout.hpp: generated by tools/panel.py, do not edit. Component centres in mm.', '#pragma once',
              'namespace layout {']
     for name, (_, layout, _, _) in MODULES.items():
+        use(name)   # FACE x follows this module's width
         lines += ['namespace %s {' % name.lower()]
         lines += ['constexpr float %s[2] = {%.2ff, %.2ff};' % (i, x, y) for i, _, x, y, _ in layout]
         lines += ['constexpr float FACE[3] = {%.2ff, %.2ff, %.3ff};   // mascot centre x, y, radius (TalkingFace)' % (MASCOT_X, BAND / 2, MASCOT_R)]
         lines += ['}']
+    use('')
     lines += ['}', '']
     return '\n'.join(lines)
 
 
 if __name__ == '__main__':
-    for name, (title, layout, _, zone_y) in MODULES.items():
+    files = {}
+    for name, (title, layout, extras, zone_y) in MODULES.items():
+        use(name)
         bad = problems(layout, title, zone_y)
         assert not bad, '%s: %s' % (name, '; '.join(bad))
-    files = {os.path.join('res', name + '.svg'): panel(*spec[:3]) for name, spec in MODULES.items()}
+        files[os.path.join('res', name + '.svg')] = panel(title, layout, extras, name not in NO_CAPTION)
+    use('')
     files[os.path.join('src', 'layout.hpp')] = header()
     for rel, body in files.items():
         with open(os.path.join(ROOT, rel), 'w', encoding='utf-8') as f:
