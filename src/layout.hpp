@@ -73,4 +73,16 @@ constexpr float RP_OUTPUT[2] = {38.50f, 115.30f};
 constexpr float ACCENT_OUTPUT[2] = {52.50f, 115.30f};
 constexpr float FACE[3] = {46.50f, 4.30f, 3.096f};   // mascot centre x, y, radius (TalkingFace)
 }
+namespace filter {
+constexpr float CUTOFF_PARAM[2] = {30.48f, 32.00f};
+constexpr float RES_PARAM[2] = {14.00f, 60.00f};
+constexpr float DRIVE_PARAM[2] = {46.96f, 60.00f};
+constexpr float CUT_CV_PARAM[2] = {30.48f, 84.00f};
+constexpr float VOCT_INPUT[2] = {12.00f, 102.00f};
+constexpr float CUT_CV_INPUT[2] = {30.48f, 102.00f};
+constexpr float RES_CV_INPUT[2] = {48.96f, 102.00f};
+constexpr float IN_INPUT[2] = {12.00f, 115.30f};
+constexpr float OUT_OUTPUT[2] = {48.96f, 115.30f};
+constexpr float FACE[3] = {46.50f, 4.30f, 3.096f};   // mascot centre x, y, radius (TalkingFace)
+}
 }

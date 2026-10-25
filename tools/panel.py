@@ -23,8 +23,8 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # Radius in mm per kind, from the Rack component SVGs: hero Rogan3PS, knob Rogan1PS, tiny BefacoTinyKnob (8.6 mm), key VCVLightBezelLatch (7.2 mm),
 # button VCVButton / VCVLightLatch (6.1 mm), light SmallSimpleLight, out = output jack. Input jacks by role, ring coloured
 # as in My lil Acid Bass: seq = clock / reset / triggers (blue), play = pitch (lime), cv = modulation (magenta)
-RADIUS = {'hero': 8.8, 'knob': 6.7, 'tiny': 4.3, 'key': 3.6, 'button': 3.1, 'light': 1.0, 'seq': 4.0, 'play': 4.0, 'cv': 4.0, 'out': 4.0}
-LABEL_SIZE = {'hero': 3.0, 'knob': 2.6, 'tiny': 2.4, 'button': 2.4, 'light': 2.0, 'seq': 2.4, 'play': 2.4, 'cv': 2.4, 'out': 2.6}
+RADIUS = {'hero': 8.8, 'knob': 6.7, 'tiny': 4.3, 'trim': 3.0, 'key': 3.6, 'button': 3.1, 'light': 1.0, 'seq': 4.0, 'play': 4.0, 'cv': 4.0, 'out': 4.0}
+LABEL_SIZE = {'hero': 3.0, 'knob': 2.6, 'tiny': 2.4, 'trim': 2.2, 'button': 2.4, 'light': 2.0, 'seq': 2.4, 'play': 2.4, 'cv': 2.4, 'out': 2.6}
 RING_COLOR = {'seq': BLUE, 'play': LIME, 'cv': MAGENTA}
 PAD_R = 4.8   # dark plate behind an output jack
 RING_R = RADIUS['cv'] + 0.7   # ring around an input jack
@@ -163,7 +163,29 @@ def ripple_extras():
     ]
 
 
-MODULES = {'Arpeggio': ('ARPEGGIO', ARPEGGIO, arpeggio_extras, ARPEGGIO_ZONE_Y), 'Ripple': ('RIPPLE', RIPPLE, ripple_extras, RIPPLE_ZONE_Y)}
+# ---- Filter: CUTOFF on top, RES and DRIVE under it, the CUT CV amount (trim) over its jack; the jack zone has the three
+# CV inputs on top and IN -> OUT along the bottom with a little low-pass curve between them. Audio in is lime, like pitch.
+FX = (12.0, W / 2, W - 12.0)
+FILTER_ZONE_Y = 94.5
+FILTER = [
+    ('CUTOFF_PARAM', 'hero', W / 2, 32.0, 'CUTOFF'),
+    ('RES_PARAM', 'knob', 14.0, 60.0, 'RES'), ('DRIVE_PARAM', 'knob', W - 14.0, 60.0, 'DRIVE'),
+    ('CUT_CV_PARAM', 'trim', FX[1], 84.0, 'AMT'),
+    ('VOCT_INPUT', 'play', FX[0], 102.0, 'V/OCT'), ('CUT_CV_INPUT', 'cv', FX[1], 102.0, 'CUT CV'), ('RES_CV_INPUT', 'cv', FX[2], 102.0, 'RES CV'),
+    ('IN_INPUT', 'play', FX[0], 115.3, 'IN'), ('OUT_OUTPUT', 'out', FX[2], 115.3, 'OUT'),
+]
+
+
+def filter_extras():
+    return [
+        '<rect x="%g" y="%g" width="%g" height="29.2" rx="2" fill="%s"/>' % (ZONE_X, FILTER_ZONE_Y, W - 2 * ZONE_X, INK2),   # jack zone, as Arpeggio's
+        '<path d="M 20 116.5 H 30.5 C 32.3 116.5 32.8 112.8 34 112.8 C 35.2 112.8 35.4 116.2 36.6 118.2 L 40 122" fill="none" '
+        'stroke="%s" stroke-width="0.6" stroke-linecap="round" stroke-linejoin="round"/>' % LIME,   # a resonant low-pass, IN to OUT
+    ]
+
+
+MODULES = {'Arpeggio': ('ARPEGGIO', ARPEGGIO, arpeggio_extras, ARPEGGIO_ZONE_Y), 'Ripple': ('RIPPLE', RIPPLE, ripple_extras, RIPPLE_ZONE_Y),
+           'Filter': ('FILTER', FILTER, filter_extras, FILTER_ZONE_Y)}
 
 
 def reach(kind):
