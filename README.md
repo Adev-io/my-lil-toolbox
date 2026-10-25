@@ -61,6 +61,28 @@ same resonance and level behavior as that voice.
 - **IN** / **OUT**: polyphonic. Each channel has its own filter and OUT has as many channels as IN. Mono CV moves every
   channel; poly CV moves each channel on its own. OUT bends softly above 5 V and never exceeds 10 V.
 
+## Slider
+
+Two 8-step slider sequencers, A and B, on one clock, with a gate button under every slider. 18 HP.
+
+- **CLOCK** steps both sections; **RESET** makes the next clock play step 1. The slider handle lights on the step each
+  section is playing.
+- **Sliders** set each step's CV; the **gate buttons** under them choose which steps fire a gate. **GATE** out is high
+  for half the clock period (10 ms before a period is known), only on steps whose button is on.
+- Per section: **LEN** (1-8 steps; A and B can differ, so they drift against each other as a polyrhythm),
+  **RNG** (0-1, 0-2, 0-5, -5..+5 or 0-10 V; default 0-5), **INV** (flips the voltage about the middle of the range),
+  **REV** (plays the section's steps backwards).
+- **CHAIN** runs one playhead through A's steps then B's (LEN A + LEN B steps, up to 16). REV still applies inside each
+  section. The section that is not playing holds its last CV with its gate low.
+- **REC** (per section): on every clock the section's **CV** input is written into the step being played (the slider
+  moves to it) and its **GATE** input (high at 1 V or more) sets that step's button. It overwrites as it passes; disarm
+  it and the section loops what it recorded. INV is applied on the way out, so a recording is stored as it came in.
+  Unpatched B CV and B GATE read A's.
+- Context menu **Snap CV to semitones** rounds both CV outs to the nearest 1/12 V.
+
+Patch idea: Slider A CV into a voice's V/OCT and A GATE into its GATE; set a few sliders and gate buttons, or arm REC
+and play a pitch CV into A CV for one pass to capture a line.
+
 ## Build
 
 MSYS2 mingw64 with the Rack SDK: `export RACK_DIR=/c/dev/Rack-SDK`, then `make test` (core checks), `make`,
