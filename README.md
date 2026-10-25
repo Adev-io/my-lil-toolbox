@@ -48,6 +48,19 @@ complementary rhythms, R and R'.
     R' when it falls past the negative threshold. Looser and off-grid.
 - **CLOCK** fires every 16th (or every beat, context menu). **ACCENT** fires once per full cycle of the active periods.
 
+## Filter
+
+The acid 24 dB/oct resonant low-pass of My lil Acid Bass, for any audio: two cascaded state-variable stages with the
+same resonance and level behavior as that voice.
+
+- **CUTOFF** 60-8000 Hz (the Acid Bass knob). **RES** rings hard at the top but stays bounded; like Acid Bass, the
+  level drops as RES rises. **DRIVE** saturates the input (tanh) before the filter: at 0 it is clean, and at any
+  setting a 5 V peak stays near 5 V while quieter signals get louder and grittier.
+- **CUT CV** with its **AMT** attenuverter (default 100%): 10 V sweeps the whole CUTOFF range. **V/OCT** makes the
+  cutoff track pitch at 1 V/oct (0 V = no change). **RES CV**: 10 V = the full RES range.
+- **IN** / **OUT**: polyphonic. Each channel has its own filter and OUT has as many channels as IN. Mono CV moves every
+  channel; poly CV moves each channel on its own. OUT bends softly above 5 V and never exceeds 10 V.
+
 ## Build
 
 MSYS2 mingw64 with the Rack SDK: `export RACK_DIR=/c/dev/Rack-SDK`, then `make test` (core checks), `make`,
