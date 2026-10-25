@@ -7,6 +7,7 @@
 #include "FaceTap.h"
 #include "Gate.h"
 #include "Ladder.h"
+#include "Slider.h"
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
@@ -781,8 +782,74 @@ void faceTapChecks()
     check (lo.head == 1, "FaceTap stride never drops below 1", lo.head);
 }
 
+void sliderChecks()
+{
+    using namespace slider;
+    // range maths
+    check (near (volts (0.5f, R0_5, false, false), 2.5), "slider: 0-5 V centre is 2.5 V");
+    check (near (volts (0.f, RPM5, false, false), -5.0) && near (volts (1.f, RPM5, false, false), 5.0), "slider: +-5 V ends");
+    check (near (volts (0.25f, R0_10, true, false), 7.5), "slider: invert flips about the centre (0.25 -> 7.5 V)");
+    check (near (volts (0.1f, R0_1, false, true), 1.0 / 12.0), "slider: snap rounds to a semitone (0.1 V -> 1/12)");
+    check (near (volts (2.f, R0_1, false, false), 1.0) && near (volts (-1.f, R0_1, false, false), 0.0), "slider: out-of-range value clamps");
+    check (near (fromVolts (2.5f, R0_5), 0.5) && near (fromVolts (-5.f, RPM5), 0.0), "slider: fromVolts inverts volts");
+    check (near (fromVolts (NAN, RPM5), 0.5), "slider: NaN CV reads as 0 V");
+
+    Settings s;
+    const bool noRec[2] = { false, false };
+    const float cv0[2] = { 0.f, 0.f };
+    const bool g0[2] = { false, false };
+
+    // forward order, length 4
+    { Seq q; s = Settings(); s.length[0] = 4; std::vector<int> got;
+      for (int i = 0; i < 6; ++i) got.push_back (q.clock (s, noRec, cv0, g0).idx[0]);
+      check (got == std::vector<int> ({ 0, 1, 2, 3, 0, 1 }), "slider: forward order wraps at LENGTH"); }
+    // reverse, length 4
+    { Seq q; s = Settings(); s.length[0] = 4; s.reverse[0] = true; std::vector<int> got;
+      for (int i = 0; i < 5; ++i) got.push_back (q.clock (s, noRec, cv0, g0).idx[0]);
+      check (got == std::vector<int> ({ 3, 2, 1, 0, 3 }), "slider: reverse plays LENGTH-1 down to 0"); }
+    // polyrhythm: A length 3, B length 2 (B steps live at 8..15)
+    { Seq q; s = Settings(); s.length[0] = 3; s.length[1] = 2; std::vector<int> a, b;
+      for (int i = 0; i < 6; ++i) { Out o = q.clock (s, noRec, cv0, g0); a.push_back (o.idx[0]); b.push_back (o.idx[1]); }
+      check (a == std::vector<int> ({ 0, 1, 2, 0, 1, 2 }) && b == std::vector<int> ({ 8, 9, 8, 9, 8, 9 }), "slider: A and B run independent lengths"); }
+    // chain: A length 3, B length 2 -> A0 A1 A2 B0 B1 A0
+    { Seq q; s = Settings(); s.length[0] = 3; s.length[1] = 2; s.chain = true; q.gate[2] = true; q.gate[9] = true;
+      std::vector<int> seq; std::vector<bool> fireA, fireB, movedA;
+      for (int i = 0; i < 6; ++i) { Out o = q.clock (s, noRec, cv0, g0); seq.push_back (o.moved[0] ? o.idx[0] : o.idx[1]);
+          fireA.push_back (o.fire[0]); fireB.push_back (o.fire[1]); movedA.push_back (o.moved[0]); }
+      check (seq == std::vector<int> ({ 0, 1, 2, 8, 9, 0 }), "slider: chain runs A then B then wraps");
+      check (fireA == std::vector<bool> ({ false, false, true, false, false, false }) && fireB == std::vector<bool> ({ false, false, false, false, true, false }),
+            "slider: chain fires only the active section's gate buttons");
+      check (movedA == std::vector<bool> ({ true, true, true, false, false, true }), "slider: chain moves one section at a time");
+      check (q.idx[0] == 0 && q.idx[1] == 9, "slider: the idle section holds its last step"); }
+    // gate buttons
+    { Seq q; s = Settings(); q.gate[1] = true; bool f0 = q.clock (s, noRec, cv0, g0).fire[0]; bool f1 = q.clock (s, noRec, cv0, g0).fire[0];
+      check (! f0 && f1, "slider: fire follows the step's gate button"); }
+    // reset: next clock plays step 0 again
+    { Seq q; s = Settings(); for (int i = 0; i < 3; ++i) q.clock (s, noRec, cv0, g0); q.reset();
+      check (q.clock (s, noRec, cv0, g0).idx[0] == 0, "slider: reset then clock plays the first step"); }
+    // LENGTH shrink wraps by modulo
+    { Seq q; s = Settings(); s.length[0] = 4; q.pos[0] = 6; q.started = true;
+      check (q.clock (s, noRec, cv0, g0).idx[0] == 3, "slider: a shorter LENGTH wraps the playhead (6 -> 7 mod 4 = 3)"); }
+    // REC captures CV and gate into the step being played
+    { Seq q; s = Settings(); s.range[0] = R0_5; const bool rec[2] = { true, false }; const float cv[2] = { 2.5f, 0.f }; const bool g[2] = { true, false };
+      Out o = q.clock (s, rec, cv, g);
+      check (near (q.val[o.idx[0]], 0.5) && q.gate[o.idx[0]] && o.fire[0], "slider: REC stores CV and gate, and the step fires");
+      q.reset(); const float cv2[2] = { 5.f, 0.f };
+      q.clock (s, noRec, cv2, g);
+      check (near (q.val[0], 0.5), "slider: disarmed section keeps its slider");
+      q.reset(); const bool gOff[2] = { false, false };
+      q.clock (s, rec, cv, gOff);
+      check (! q.gate[0], "slider: REC overwrites a gate with 'off'");
+      check (near (q.val[8], 0.0), "slider: REC on A does not touch B"); }
+    // REC stores raw (invert is output-side only)
+    { Seq q; s = Settings(); s.invert[0] = true; s.range[0] = R0_10; const bool rec[2] = { true, false }; const float cv[2] = { 2.5f, 0.f };
+      q.clock (s, rec, cv, g0);
+      check (near (q.val[0], 0.25), "slider: REC stores the raw value even with INVERT on"); }
+}
+
 int main()
 {
+    sliderChecks();
     faceTapChecks();
     testPresets();
     testTypeIndex();
