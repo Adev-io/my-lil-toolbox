@@ -7,6 +7,7 @@ extern Plugin* pluginInstance;
 extern Model* modelArpeggio;
 extern Model* modelRipple;
 extern Model* modelFilter;
+extern Model* modelSlider;
 
 // House light colours, the same as the panels (tools/panel.py) and My lil Acid Bass.
 struct LimeLight : GrayModuleLightWidget { LimeLight() { addBaseColor (nvgRGB (0xc8, 0xff, 0x3a)); } };
