@@ -4,6 +4,7 @@
 #include "plugin.hpp"
 #include "layout.hpp"
 #include "Section.h"
+#include "Gate.h"
 #include "TalkingFace.hpp"
 
 struct Arpeggio : Module
@@ -19,12 +20,14 @@ struct Arpeggio : Module
     dsp::SchmittTrigger trigA, trigB, randTrig, resetTrig;
     dsp::BooleanTrigger randBtn, dirBtn;
     dsp::PulseGenerator pulseA, pulseB;
+    gate::Gate gateA, gateB;   // run always, so a period is known the moment gateOuts turns on
     dsp::ClockDivider lightDiv;
     FaceTap face;   // the mascot's mouth
     int lastType = -1;   // TYPE index whose preset the keys last loaded; -1 = load on the next sample
     int typeSettle = 0;   // samples to ignore TYPE after a patch load: cables read 0 V until upstream modules run
     int dir = arp::UP;
     bool passThrough = false;
+    bool gateOuts = false;   // TRIG outs send gates (half the clock period) instead of 1 ms pulses
 
     Arpeggio()
     {
@@ -107,8 +110,10 @@ struct Arpeggio : Module
         if (ob.trig) pulseB.trigger (1e-3f);
         outputs[A_CV_OUTPUT].setVoltage (oa.volts);
         outputs[B_CV_OUTPUT].setVoltage (ob.volts);
-        outputs[A_TRIG_OUTPUT].setVoltage (pulseA.process (args.sampleTime) ? 10.f : 0.f);
-        outputs[B_TRIG_OUTPUT].setVoltage (pulseB.process (args.sampleTime) ? 10.f : 0.f);
+        const bool pA = pulseA.process (args.sampleTime), pB = pulseB.process (args.sampleTime);
+        const bool gA = gateA.process (oa.trig, args.sampleTime), gB = gateB.process (ob.trig, args.sampleTime);
+        outputs[A_TRIG_OUTPUT].setVoltage ((gateOuts ? gA : pA) ? 10.f : 0.f);
+        outputs[B_TRIG_OUTPUT].setVoltage ((gateOuts ? gB : pB) ? 10.f : 0.f);
         face.push (clamp ((outputs[A_CV_OUTPUT].getVoltage() + outputs[B_CV_OUTPUT].getVoltage()) / 4.f, -1.f, 1.f), args.sampleRate);
 
         if (lightDiv.process()) setLights (mask, oa.pc, ob.pc, s.arpMode);
@@ -136,8 +141,11 @@ struct Arpeggio : Module
         lastType = -1;   // the next sample loads major into the keys
         dir = arp::UP;
         passThrough = false;
+        gateOuts = false;
         a.arpeggiator.reset();
         b.arpeggiator.reset();
+        gateA.reset();
+        gateB.reset();
     }
 
     json_t* dataToJson() override
@@ -146,6 +154,7 @@ struct Arpeggio : Module
         json_object_set_new (root, "type", json_integer (lastType));
         json_object_set_new (root, "dir", json_integer (dir));
         json_object_set_new (root, "passThrough", json_boolean (passThrough));
+        json_object_set_new (root, "gateOuts", json_boolean (gateOuts));
         return root;
     }
 
@@ -154,6 +163,10 @@ struct Arpeggio : Module
         if (json_t* j = json_object_get (root, "type")) lastType = clamp ((int) json_integer_value (j), -1, scale::numPresets - 1);
         if (json_t* j = json_object_get (root, "dir")) dir = clamp ((int) json_integer_value (j), 0, arp::NUM_DIRS - 1);
         if (json_t* j = json_object_get (root, "passThrough")) passThrough = json_boolean_value (j);
+        gateOuts = false;   // patches saved before the toggle have no key: off
+        if (json_t* j = json_object_get (root, "gateOuts")) gateOuts = json_boolean_value (j);
+        gateA.reset();
+        gateB.reset();
         typeSettle = 64;
     }
 };
@@ -205,6 +218,7 @@ struct ArpeggioWidget : ModuleWidget
         if (! m) return;
         menu->addChild (new MenuSeparator);
         menu->addChild (createBoolPtrMenuItem ("Triggers pass through (quantizer mode)", "", &m->passThrough));
+        menu->addChild (createBoolPtrMenuItem ("TRIG outs send gates (half the clock period)", "", &m->gateOuts));
     }
 };
 
