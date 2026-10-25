@@ -5,6 +5,7 @@
 #include "Section.h"
 #include "Rhythm.h"
 #include "FaceTap.h"
+#include "Gate.h"
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
@@ -594,6 +595,72 @@ void testRhythmClock()
         check (internal.empty() && waiting && sameTicks (c2, { { 0, 3 } }) && near (c.frac, 0.58), "clock: re-patched EXT measures a fresh interval (frac 0, then 29/50)", c.frac);
     }
 }
+// Runs the gate n samples with trigs on the sample indexes in `trigs` (relative to this run); returns each sample's state.
+std::vector<bool> runGate (gate::Gate& g, int n, std::initializer_list<int> trigs, float dt = 1e-3f)
+{
+    std::vector<bool> high;
+    for (int i = 0; i < n; ++i)
+    {
+        bool trig = false;
+        for (int t : trigs) trig = trig || t == i;
+        high.push_back (g.process (trig, dt));
+    }
+    return high;
+}
+
+// True when the gate is high exactly on samples [from, to) of `h` and low on every other sample from `from` on.
+bool highOnly (const std::vector<bool>& h, int from, int to)
+{
+    for (int i = from; i < (int) h.size(); ++i)
+        if (h[i] != (i < to)) return false;
+    return true;
+}
+
+void testGate()
+{
+    {
+        gate::Gate g;
+        check (highOnly (runGate (g, 100, { 0 }), 0, 10), "gate: first trig gives 10 ms");
+    }
+    {
+        gate::Gate g;
+        const std::vector<bool> h = runGate (g, 400, { 0, 100, 200, 300 });
+        check (highOnly (h, 300, 350) && h[100] && h[149] && ! h[150], "gate: steady 100 ms period gives 50 ms");
+    }
+    {
+        gate::Gate g;
+        check (highOnly (runGate (g, 400, { 0, 100, 200, 260 }), 260, 290), "gate: a period change sets the next gate (60 ms -> 30 ms)");
+    }
+    {
+        gate::Gate g;
+        const std::vector<bool> h = runGate (g, 300, { 0, 100, 140 });   // 140 lands inside 100's 50 ms gate
+        check (highOnly (h, 100, 160), "gate: a retrigger while high restarts it (40 ms -> 20 ms from the retrigger)");
+    }
+    {
+        gate::Gate g;
+        bool any = false;
+        for (bool b : runGate (g, 5000, {})) any = any || b;
+        check (! any, "gate: no trig, no gate");
+        runGate (g, 200, { 0, 100 });
+        any = false;
+        for (bool b : runGate (g, 5000, {})) any = any || b;
+        check (! any, "gate: low while idle after a gate");
+    }
+    {
+        gate::Gate g;   // 10 kHz, trigs 0.4 ms apart: half is 0.2 ms, clamped up to 1 ms = 10 samples
+        check (highOnly (runGate (g, 100, { 0, 4, 8 }, 1e-4f), 8, 18), "gate: clamps up to 1 ms");
+    }
+    {
+        gate::Gate g;   // 6 s between trigs (clock stopped): half is 3 s, clamped down to 2 s
+        check (highOnly (runGate (g, 10000, { 0, 6000 }), 6000, 8000), "gate: clamps down to 2 s");
+    }
+    {
+        gate::Gate g;
+        runGate (g, 300, { 0, 100, 200 });
+        g.reset();
+        check (highOnly (runGate (g, 100, { 0 }), 0, 10), "gate: after reset the first trig gives 10 ms again");
+    }
+}
 // ---- tests (each task adds its functions above this line)
 }
 
@@ -643,6 +710,7 @@ int main()
     testRhythmCounter();
     testRhythmWave();
     testRhythmClock();
+    testGate();
     // ---- calls (each task adds its calls above this line)
     std::printf ("\n%s: %d failure(s)\n", failures ? "FAILED" : "PASSED", failures);
     return failures ? 1 : 0;
