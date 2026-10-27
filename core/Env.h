@@ -59,7 +59,7 @@ struct Env
     // a, d, r: seconds. s: 0..1. dt: seconds per sample.
     float process (float dt, float a, float d, float s, float r)
     {
-        const float minT = 1e-4f;   // ponytail: a floor, so a time of 0 cannot divide by zero
+        const float minT = 1e-4f;   // a floor, so a time of 0 cannot divide by zero
         switch (stage)
         {
             case Attack:
