@@ -77,9 +77,10 @@ struct Ripple : Module
         endGate();
     }
 
-    void envTrig()   // an ENV hit: retrigger the attack and hold the gate for LEN ticks
+    // extra: WAVE crossings land between ticks: one extra tick, so the gate is never shorter than LEN
+    void envTrig (int extra = 0)   // an ENV hit: retrigger the attack and hold the gate for LEN ticks
     {
-        hold.hit ((int) std::round (params[GATELEN_PARAM].getValue()));
+        hold.hit ((int) std::round (params[GATELEN_PARAM].getValue()) + extra);
         adsr.trigger();
     }
 
@@ -144,7 +145,7 @@ struct Ripple : Module
             {
                 if (wr) rPulse.trigger (1e-3f);
                 if (wrp) rpPulse.trigger (1e-3f);
-                if (env::waveHitOf (wr, wrp, envSource)) envTrig();
+                if (env::waveHitOf (wr, wrp, envSource)) envTrig (1);
             }
         }
 
