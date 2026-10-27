@@ -48,14 +48,15 @@ complementary rhythms, R and R'.
     R' when it falls past the negative threshold. Looser and off-grid.
 - **CLOCK** fires every 16th (or every beat, context menu). **ACCENT** fires once per full cycle of the active periods.
 - **ENV** (right-hand column, an ADSR for a VCA): ATTACK 1 ms-5 s, DECAY 1 ms-5 s, SUSTAIN 0-100 %, RELEASE 1 ms-10 s,
-  and **LEN** (1-16 sixteenths). Each hit of the chosen source retriggers the attack from the current level and holds the
-  gate for LEN sixteenths; the ENV out is 0-10 V. Context menu "ENV fires on": R (default), R', ACCENT, A, B, C or D.
-  In WAVE mode the held length reads LEN to LEN+1 sixteenths (never shorter than LEN; LEN 16 is capped at 16), because R and R' land between ticks.
-  A hit while the gate is still held re-arms it, so the VCA only closes when LEN is shorter than the gap between hits:
-  a dense rhythm (the default A 2 + B 3 on R hits every 1-2 sixteenths) keeps ENV open at any LEN of 2 or more. Turn LEN down, or
-  thin the rhythm (DENSITY, fewer generators), for a gap.
-  The gate counts clock ticks: if an EXT clock stops mid-gate, ENV holds at SUSTAIN until PLAY is toggled or RESET.
-  Ripple is 16 HP since 2.2.0 (was 12): in an old patch, a module right next to Ripple may now overlap it.
+  and **LEN** (1-16 sixteenths). Each hit of the chosen source retriggers the attack from the current level and holds
+  the gate for LEN sixteenths; the ENV out is 0-10 V. Context menu "ENV fires on": R (default), R', ACCENT, A, B, C or
+  D. In WAVE mode the held length reads LEN to LEN+1 sixteenths (never shorter than LEN; LEN 16 is capped at 16),
+  because R and R' land between ticks. A hit while the gate is still held re-arms it, so the VCA only closes when LEN is
+  shorter than the gap between hits: in GRID mode a dense rhythm (the default A 2 + B 3 on R hits every 1-2 sixteenths)
+  keeps ENV open at any LEN of 2 or more; in WAVE it takes LEN 3 or more. Turn LEN down, or thin the rhythm (DENSITY,
+  fewer generators), for a gap. The gate counts clock ticks: if an EXT clock stops mid-gate, ENV holds at SUSTAIN until
+  PLAY is toggled or RESET. Ripple is 16 HP since 2.2.0 (was 12): in an old patch, a module right next to Ripple may now
+  overlap it.
 
 ## Filter
 
