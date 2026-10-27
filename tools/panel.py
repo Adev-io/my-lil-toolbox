@@ -59,7 +59,7 @@ def text(s, x, y, size, fill, anchor='middle', stroke=0.0):
 TITLE_X, TITLE_Y, TITLE_SIZE = 11.2, 6.3, 4.3
 MASCOT_X = W - 14.46   # 46.5 on 12 HP
 MASCOT_R = BAND * 0.36
-HP = {'Slider': 18}   # panel width per module, 12 HP unless named here
+HP = {'Slider': 18, 'Ripple': 16}   # panel width per module, 12 HP unless named here
 NO_CAPTION = {'Slider'}   # modules whose parts sit where the 'my lil toolbox' caption goes
 
 
@@ -142,6 +142,7 @@ GX = (10.5, 24.5, 38.5, 52.5)   # generator columns A-D, 14 mm apart (plate D st
 ROW_PERIOD, ROW_ON, ROW_CV = 62.0, 75.0, 86.0
 OUT_X = (GX[0] + GX[3]) / 2   # the OUT header sits over the middle of the generator grid
 RIPPLE_ZONE_Y = 95.0
+EX = 69.5   # the ENV column, right of the generator grid
 RIPPLE = [
     ('TEMPO_PARAM', 'hero', 12.0, 25.0, 'TEMPO'), ('TEMPO_LIGHT', 'light', 22.5, 17.5, ''),
     ('TEMPO_INPUT', 'cv', 27.0, 29.5, 'CV'), ('EXT_INPUT', 'seq', 38.5, 29.5, 'EXT'),
@@ -154,6 +155,9 @@ RIPPLE = [
     ('PERIOD%d_INPUT' % i, 'cv', x, ROW_CV, ''), ('GEN%d_OUTPUT' % i, 'out', x, 101.0, name))] + [
     ('CLOCK_OUTPUT', 'out', GX[0], 115.3, 'CLOCK'), ('R_OUTPUT', 'out', GX[1], 115.3, 'R'),
     ('RP_OUTPUT', 'out', GX[2], 115.3, "R'"), ('ACCENT_OUTPUT', 'out', GX[3], 115.3, 'ACCENT'),
+    ('ATTACK_PARAM', 'tiny', EX, 24.0, 'ATTACK'), ('DECAY_PARAM', 'tiny', EX, 39.0, 'DECAY'),
+    ('SUSTAIN_PARAM', 'tiny', EX, 54.0, 'SUSTAIN'), ('RELEASE_PARAM', 'tiny', EX, 69.0, 'RELEASE'),
+    ('GATELEN_PARAM', 'tiny', EX, 84.0, 'LEN'), ('ENV_OUTPUT', 'out', EX, 115.3, 'ENV'),
 ]
 
 
@@ -169,6 +173,8 @@ def ripple_extras():
         '<rect x="%g" y="91.5" width="11" height="4.2" fill="%s"/>' % (OUT_X - 5.5, INK),
         text('OUT', OUT_X, 94.6, 3.0, MAGENTA, stroke=0.2),
         caption('PERIOD', ROW_PERIOD), caption('ON', ROW_ON), caption('CV', ROW_CV),
+        '<rect x="61.2" y="14.6" width="0.4" height="76" fill="%s"/>' % DIM,   # divider: the ENV column
+        text('ENV', EX, 17.0, 3.0, MAGENTA, stroke=0.2),
     ]
 
 

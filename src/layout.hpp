@@ -71,7 +71,13 @@ constexpr float CLOCK_OUTPUT[2] = {10.50f, 115.30f};
 constexpr float R_OUTPUT[2] = {24.50f, 115.30f};
 constexpr float RP_OUTPUT[2] = {38.50f, 115.30f};
 constexpr float ACCENT_OUTPUT[2] = {52.50f, 115.30f};
-constexpr float FACE[3] = {46.50f, 4.30f, 3.096f};   // mascot centre x, y, radius (TalkingFace)
+constexpr float ATTACK_PARAM[2] = {69.50f, 24.00f};
+constexpr float DECAY_PARAM[2] = {69.50f, 39.00f};
+constexpr float SUSTAIN_PARAM[2] = {69.50f, 54.00f};
+constexpr float RELEASE_PARAM[2] = {69.50f, 69.00f};
+constexpr float GATELEN_PARAM[2] = {69.50f, 84.00f};
+constexpr float ENV_OUTPUT[2] = {69.50f, 115.30f};
+constexpr float FACE[3] = {66.82f, 4.30f, 3.096f};   // mascot centre x, y, radius (TalkingFace)
 }
 namespace filter {
 constexpr float CUTOFF_PARAM[2] = {30.48f, 32.00f};

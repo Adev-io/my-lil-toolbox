@@ -7,6 +7,7 @@
 #include "FaceTap.h"
 #include "Gate.h"
 #include "Ladder.h"
+#include "Env.h"
 #include "Slider.h"
 #include <algorithm>
 #include <cmath>
@@ -847,6 +848,129 @@ void sliderChecks()
       check (near (q.val[0], 0.25), "slider: REC stores the raw value even with INVERT on"); }
 }
 
+void testEnv()
+{
+    const float dt = 1.f / 48000.f;
+    check (near (env::timeOf (0.f, 5.f), 0.001, 1e-6) && near (env::timeOf (1.f, 5.f), 5.0, 1e-3) && near (env::timeOf (1.f, 10.f), 10.0, 1e-3),
+           "env: knob maps 0..1 to 1 ms .. max seconds, log");
+    check (near (env::timeOf (env::knobOf (0.2f, 5.f), 5.f), 0.2, 1e-4), "env: knobOf inverts timeOf");
+    {
+        env::Env e;
+        float lo = 0.f, hi = 0.f;
+        auto run = [&] (int cnt) { for (int i = 0; i < cnt; ++i) { const float v = e.process (dt, 0.01f, 0.1f, 0.3f, 0.05f); lo = std::min (lo, v); hi = std::max (hi, v); } };
+        e.trigger();
+        int n = 0;
+        while (e.stage == env::Env::Attack && n < 2000) { run (1); ++n; }
+        check (near (n, 480, 1.5) && e.level == 1.f && e.stage == env::Env::Decay, "env: attack reaches 1 in A seconds", n);
+        run (4800);
+        check (near (e.level, 0.307, 2e-4), "env: decay covers 99 % of the way to S in D seconds", e.level);
+        run (96000);
+        check (near (e.level, 0.3, 1e-6) && e.stage == env::Env::Decay, "env: settles at S and holds while the gate is on", e.level);
+        e.release();
+        run (2400);
+        check (near (e.level, 0.003, 2e-4), "env: release covers 99 % of the way to 0 in R seconds", e.level);
+        run (4800);
+        check (e.level == 0.f && e.stage == env::Env::Idle, "env: release ends at exactly 0 and idles", e.level);
+        check (lo >= 0.f && hi <= 1.f, "env: stays inside 0..1", hi);
+        e.trigger();
+        run (100);
+        const bool live = e.level > 0.f && e.stage != env::Env::Idle;
+        e.reset();
+        check (live && e.level == 0.f && e.stage == env::Env::Idle, "env: reset clears level and stage", e.level);
+    }
+    {
+        env::Env e;
+        e.trigger();
+        for (int i = 0; i < 480 + 2400; ++i) e.process (dt, 0.01f, 0.1f, 0.2f, 0.05f);   // attack, then half a decay: level near 0.28
+        const float before = e.level;
+        e.trigger();
+        const float after = e.process (dt, 0.01f, 0.1f, 0.2f, 0.05f);
+        check (before > 0.2f && after > before && after - before <= dt / 0.01f * 1.01f, "env: a retrigger attacks from the current level, no jump", after - before);
+    }
+    {
+        env::Env e;
+        e.trigger();
+        for (int i = 0; i < 480; ++i) e.process (dt, 0.01f, 0.1f, 0.2f, 0.05f);   // attack to the top
+        e.release();
+        for (int i = 0; i < 1200; ++i) e.process (dt, 0.01f, 0.1f, 0.2f, 0.05f);   // half a release: level near 0.1
+        const float before = e.level;
+        const bool releasing = e.stage == env::Env::Release;
+        e.trigger();
+        const float after = e.process (dt, 0.01f, 0.1f, 0.2f, 0.05f);
+        check (releasing && before > 0.05f && e.stage == env::Env::Attack && after > before && after - before <= dt / 0.01f * 1.01f,
+               "env: a hit during release attacks from the current level, no jump", after - before);
+    }
+    {
+        env::Env e;
+        e.release();
+        check (e.process (dt, 0.01f, 0.1f, 0.5f, 0.05f) == 0.f && e.stage == env::Env::Idle, "env: release while idle stays idle");
+        e.trigger();
+        bool ok = true;
+        for (int i = 0; i < 10; ++i)
+        {
+            const float v = e.process (dt, 0.f, 0.f, 0.5f, 0.f);   // every time at 0: no divide by zero
+            ok = ok && std::isfinite (v) && v >= 0.f && v <= 1.f;
+        }
+        check (ok, "env: times of 0 stay finite and inside 0..1");
+        env::Env z;
+        z.trigger();
+        const float first = z.process (dt, 0.f, 0.1f, 0.5f, 0.1f);   // the floor makes the first sample dt / 1e-4 = 0.208, not a jump to 1
+        check (first > 0.f && first < 0.5f, "env: an attack time of 0 is floored, not a jump to the top", first);
+    }
+    {
+        env::GateHold g;
+        g.hit (1);
+        const bool onAfterHit = g.on();
+        const bool fell = g.tick();
+        check (onAfterHit && fell && ! g.on(), "gate hold: LEN 1 lasts exactly one tick");
+    }
+    {
+        env::GateHold g;
+        g.hit (16);
+        int falls = 0, at = 0;
+        for (int i = 1; i <= 20; ++i)
+            if (g.tick()) { ++falls; at = i; }
+        check (falls == 1 && at == 16, "gate hold: LEN 16 falls once, on the 16th tick", at);
+    }
+    {
+        env::GateHold g;
+        g.hit (4); g.tick(); g.tick();
+        g.hit (4);   // re-arm while on
+        g.tick(); g.tick(); g.tick();
+        const bool stillOn = g.on();
+        const bool fell = g.tick();
+        check (stillOn && fell && ! g.on(), "gate hold: a hit while on re-arms the full length");
+        g.hit (3);
+        g.reset();
+        check (! g.on() && ! g.tick(), "gate hold: reset clears it, and an idle tick never reports a fall");
+        g.hit (0);
+        const bool low = g.tick();   // 0 clamps to 1
+        g.hit (99);
+        int n = 0;
+        while (! g.tick() && n < 100) ++n;   // 99 clamps to 16: 15 ticks, then the 16th falls
+        check (low && n == 15, "gate hold: LEN clamps to 1..16", n);
+    }
+    {
+        const rhythm::Tick k { 5u, true, false, true };   // A and C hit; R and ACCENT, not R'
+        const bool want[env::numSources] = { true, false, true, true, false, true, false };   // R R' ACCENT A B C D
+        const rhythm::Tick k2 { 10u, false, true, false };   // B and D hit; R' only
+        const bool want2[env::numSources] = { false, true, false, false, true, false, true };   // R R' ACCENT A B C D
+        bool grid = true, wave = true;
+        for (int s = 0; s < env::numSources; ++s)
+        {
+            const bool crossing = s == env::SrcR || s == env::SrcRp;
+            grid = grid && env::hitOf (k, s, false) == want[s] && env::hitOf (k2, s, false) == want2[s];
+            wave = wave && env::hitOf (k, s, true) == (crossing ? false : want[s]) && env::hitOf (k2, s, true) == (crossing ? false : want2[s]);
+        }
+        check (grid, "env: hitOf picks exactly the chosen source (GRID)");
+        check (wave, "env: hitOf leaves R and R' to the crossings in WAVE");
+        check (env::waveHitOf (true, false, env::SrcR) && ! env::waveHitOf (false, true, env::SrcR)
+               && env::waveHitOf (false, true, env::SrcRp) && ! env::waveHitOf (true, false, env::SrcRp)
+               && ! env::waveHitOf (true, true, env::SrcA), "env: waveHitOf maps the R and R' crossings and nothing else");
+        check (! env::hitOf (k, 99, false) && ! env::hitOf (k, -1, false), "env: an out-of-range source never hits");
+    }
+}
+
 int main()
 {
     sliderChecks();
@@ -872,6 +996,7 @@ int main()
     testGate();
     testLadderResponse();
     testLadderSafety();
+    testEnv();
     // ---- calls (each task adds its calls above this line)
     std::printf ("\n%s: %d failure(s)\n", failures ? "FAILED" : "PASSED", failures);
     return failures ? 1 : 0;
