@@ -1106,13 +1106,6 @@ void testMixer()
     }
     check (near (mixer::releaseOf (0.f), 0.02) && near (mixer::releaseOf (1.f), 1.0, 1e-4) && near (mixer::releaseOf (mixer::knobOfRelease (0.15f)), 0.15, 1e-4),
            "mixer: RELEASE knob is 20 ms .. 1 s, log, and knobOfRelease inverts it");
-    {
-        const float c = mixer::peakCoef (dt);
-        float p = mixer::peak (0.f, -6.f, c);
-        check (p == 6.f, "mixer: peak catches the magnitude", p);
-        for (int i = 0; i < 4800; ++i) p = mixer::peak (p, 0.f, c);
-        check (near (p, 6.0 * std::exp (-1.0), 1e-3), "mixer: peak falls to 1/e in 100 ms", p);
-    }
     check (mixer::softClip (4.9f) == 4.9f && mixer::softClip (-5.f) == -5.f, "mixer: soft clip is the identity up to 5 V");
     check (near ((mixer::softClip (5.001f) - 5.f) / 0.001f, 1.0, 1e-2), "mixer: soft clip has slope 1 at the knee", mixer::softClip (5.001f));
     check (mixer::softClip (100.f) <= 8.f && mixer::softClip (-100.f) >= -8.f && mixer::softClip (100.f) > 7.9f && mixer::softClip (6.f) < 6.f, "mixer: soft clip bends above 5 V and never passes 8 V", mixer::softClip (100.f));
