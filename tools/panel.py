@@ -244,7 +244,7 @@ def slider_extras():
 # ---- Mixer (26 HP): eight strip columns (SEND 1, SEND 2, DUCK, PAN, LEVEL fader, signal light, MUTE, SOLO, IN L, IN R),
 # rows captioned in the left margin, strip numbers on top; the master section right of a divider. Built on its own
 # width MW, never the global W. Strip parts carry no labels: the captions and numbers name them.
-MW = 5.08 * 26
+MW = 5.08 * HP['Mixer']
 STRIP_DX = 11.0
 MIX_X = [10.5 + STRIP_DX * i for i in range(8)]   # strip columns, 11 mm apart (the widget steps by STRIP_DX from strip 0)
 ROW_S1, ROW_S2, ROW_DUCK, ROW_PAN, ROW_LEVEL = 19.0, 28.8, 38.6, 48.4, 67.5
@@ -270,17 +270,19 @@ MIXER = [part for i, x in enumerate(MIX_X) for part in (
 def mixer_extras():
     return [
         '<rect x="%g" y="%g" width="%g" height="23.7" rx="2" fill="%s"/>' % (ZONE_X, MIXER_ZONE_Y, MW - 2 * ZONE_X, INK2),   # jack zone, bottom at 123.7
-        '<rect x="94.6" y="14.6" width="0.4" height="83" fill="%s"/>' % DIM,   # divider: the master section
+        '<rect x="%g" y="14.6" width="0.4" height="83" fill="%s"/>' % ((MIX_X[-1] + MC[0]) / 2 - 0.2, DIM),   # divider: the master section, centred between strip 8 and the master columns
     ] + ['<rect x="%g" y="%g" width="4.2" height="%g" rx="1" fill="%s"/>' % (x - 2.1, ROW_LEVEL - SLIDER_BOX[1] / 2, SLIDER_BOX[1], INK2)
          for x in MIX_X] + [text(str(i + 1), x, 13.6, 2.8, LIME, stroke=0.2) for i, x in enumerate(MIX_X)] + [
-        caption(s, y) for s, y in (('SEND 1', ROW_S1), ('SEND 2', ROW_S2), ('DUCK', ROW_DUCK), ('PAN', ROW_PAN), ('LEVEL', ROW_LEVEL),
+        (text(s, 3.4, y + 0.8, 2.2, DIM) if len(s) == 1 else caption(s, y))   # one letter reads upright, longer words upwards
+        for s, y in (('SEND 1', ROW_S1), ('SEND 2', ROW_S2), ('DUCK', ROW_DUCK), ('PAN', ROW_PAN), ('LEVEL', ROW_LEVEL),
                                    ('M', ROW_MUTE), ('S', ROW_SOLO), ('L', ROW_INL), ('R', ROW_INR))]
 
 
 MODULES = {'Arpeggio': ('MY LIL ARPEGGIO', ARPEGGIO, arpeggio_extras, ARPEGGIO_ZONE_Y), 'Ripple': ('MY LIL RIPPLE', RIPPLE, ripple_extras, RIPPLE_ZONE_Y),
            'Filter': ('MY LIL FILTER', FILTER, filter_extras, FILTER_ZONE_Y), 'Slider': ('MY LIL SLIDER', SLIDER, slider_extras, SLIDER_ZONE_Y),
            'Mixer': ('MY LIL MIXER', MIXER, mixer_extras, MIXER_ZONE_Y)}
-EXTRA_CONSTS = {'Mixer': ['constexpr float STRIP_DX = %.2ff;   // strip column pitch: strip i sits at strip 0 + i * STRIP_DX' % STRIP_DX]}
+EXTRA_CONSTS = {'Mixer': ['constexpr float STRIP_DX = %.2ff;   // strip column pitch: strip i sits at strip 0 + i * STRIP_DX' % STRIP_DX,
+                          'constexpr int STRIPS = %d;   // strip count; Mixer.cpp static_asserts it equals mixer::numStrips' % len(MIX_X)]}
 
 
 def reach(kind):

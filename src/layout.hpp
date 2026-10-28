@@ -243,5 +243,6 @@ constexpr float OUT_L_OUTPUT[2] = {112.00f, 110.00f};
 constexpr float OUT_R_OUTPUT[2] = {123.00f, 110.00f};
 constexpr float FACE[3] = {117.62f, 4.30f, 3.096f};   // mascot centre x, y, radius (TalkingFace)
 constexpr float STRIP_DX = 11.00f;   // strip column pitch: strip i sits at strip 0 + i * STRIP_DX
+constexpr int STRIPS = 8;   // strip count; Mixer.cpp static_asserts it equals mixer::numStrips
 }
 }
