@@ -93,6 +93,26 @@ Two 8-step slider sequencers, A and B, on one clock, with a gate button under ev
 Patch idea: Slider A CV into a voice's V/OCT and A GATE into its GATE; set a few sliders and gate buttons, or arm REC
 and play a pitch CV into A CV for one pass to capture a line.
 
+## My lil Mixer
+
+Eight stereo strips into a master bus, with two sends and returns and one sidechain that ducks every strip. 26 HP.
+
+- Per strip: **IN L** and **IN R** (unpatched R copies L; poly cables are summed), **LEVEL** fader (0 dB at the default,
+  +6 dB at the top), **PAN** (a mono source pans at constant power, a stereo source balances), **SEND 1** and **SEND 2**,
+  **DUCK**, **M** (mute) and **S** (solo). Any solo plays only the soloed strips; mute always wins. The light over M
+  shows the strip's level, magenta when it runs above 5 V.
+- **SC** feeds the sidechain: each strip's **DUCK** sets how far it is pulled down when the sidechain hits, **REL** how
+  fast it comes back (20 ms to 1 s). Patch the kick into SC and turn up DUCK on the bass and pads for the house pump;
+  leave the kick's own strip at 0.
+- **SND1** and **SND2** are stereo sends, **RTN1** and **RTN2** stereo returns summed into the master at unity
+  (unpatched R copies L). **MASTER** sets the output level; **OUT L** and **OUT R** are the mix.
+- Context menu: **SC IN reads** Audio (an envelope follower, the default) or Triggers (each rising edge fires one
+  duck, so the pump stays even whatever the kick's level); **Sends pre-fader** (off: post-fader); **Master soft clip**
+  (on by default: untouched up to 5 V, then a smooth bend that never passes 8 V).
+
+Patch idea: Drums kick into strip 1 and into SC, an acid line into strip 2 with DUCK at 70 %, a pad into strip 3 with
+SEND 1 into a reverb, the reverb back into RTN1, OUT L/R to the audio interface.
+
 ## Build
 
 MSYS2 mingw64 with the Rack SDK: `export RACK_DIR=/c/dev/Rack-SDK`, then `make test` (core checks), `make`,
