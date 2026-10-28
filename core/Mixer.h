@@ -12,6 +12,8 @@ constexpr int numStrips = 8;
 constexpr float unityKnob = 0.70710678f;   // the LEVEL / MASTER knob position for 0 dB
 constexpr float hotV = 5.f;                // signal light turns magenta above this; soft clip starts here
 
+inline float finite (float v) { return std::isfinite (v) ? v : 0.f; }   // NaN / inf read as 0 V; no ±10 V clamp, so a hot or summed input keeps its shape
+
 // LEVEL / MASTER knob 0..1 -> gain 2 k^2: silence at 0, unity at 1/sqrt 2, +6 dB at 1.
 inline float levelGain (float k) { return 2.f * k * k; }
 // SEND knob 0..1 -> gain k^2: silence at 0, unity at 1.
@@ -62,8 +64,8 @@ struct Strip
         gl = slew (gl, g * panL, step);
         gr = slew (gr, g * panR, step);
         const float d = 1.f - duck * env;
-        preL = scale::clampV (l) * d;
-        preR = scale::clampV (r) * d;
+        preL = finite (l) * d;
+        preR = finite (r) * d;
         outL = preL * gl;
         outR = preR * gr;
     }

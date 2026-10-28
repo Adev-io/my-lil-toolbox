@@ -8,7 +8,7 @@
 static_assert (layout::mixer::STRIPS == mixer::numStrips, "tools/panel.py strip count must match core/Mixer.h");
 
 // LEVEL / MASTER shown in dB of the knob's 2 k^2 gain
-struct GainQuantity : ParamQuantity
+struct MixerGainQuantity : ParamQuantity
 {
     float getDisplayValue() override
     {
@@ -49,7 +49,7 @@ struct Mixer : Module
         for (int i = 0; i < N; ++i)
         {
             const std::string s = "Strip " + std::to_string (i + 1);
-            configParam<GainQuantity> (LEVEL_PARAM + i, 0.f, 1.f, mixer::unityKnob, s + " level", " dB");
+            configParam<MixerGainQuantity> (LEVEL_PARAM + i, 0.f, 1.f, mixer::unityKnob, s + " level", " dB");
             configParam (PAN_PARAM + i, -1.f, 1.f, 0.f, s + " pan", "%", 0.f, 100.f);
             configParam (SEND1_PARAM + i, 0.f, 1.f, 0.f, s + " send 1", "%", 0.f, 100.f);
             configParam (SEND2_PARAM + i, 0.f, 1.f, 0.f, s + " send 2", "%", 0.f, 100.f);
@@ -59,7 +59,7 @@ struct Mixer : Module
             configInput (L_INPUT + i, s + " left / mono (poly cables are summed)");
             configInput (R_INPUT + i, s + " right (unpatched: copies left)");
         }
-        configParam<GainQuantity> (MASTER_PARAM, 0.f, 1.f, mixer::unityKnob, "Master level", " dB");
+        configParam<MixerGainQuantity> (MASTER_PARAM, 0.f, 1.f, mixer::unityKnob, "Master level", " dB");
         configParam (RELEASE_PARAM, 0.f, 1.f, mixer::knobOfRelease (0.15f), "Duck release", " ms", 50.f, 20.f);
         configInput (SC_INPUT, "Sidechain (audio or triggers, see the menu)");
         configInput (RETURN1_L_INPUT, "Return 1 left / mono");
@@ -72,13 +72,21 @@ struct Mixer : Module
         configOutput (SEND1_R_OUTPUT, "Send 1 right");
         configOutput (SEND2_L_OUTPUT, "Send 2 left");
         configOutput (SEND2_R_OUTPUT, "Send 2 right");
+        // Randomize leaves the mix alone: levels, mutes, solos, master
+        for (int i = 0; i < N; ++i)
+        {
+            paramQuantities[LEVEL_PARAM + i]->randomizeEnabled = false;
+            paramQuantities[MUTE_PARAM + i]->randomizeEnabled = false;
+            paramQuantities[SOLO_PARAM + i]->randomizeEnabled = false;
+        }
+        paramQuantities[MASTER_PARAM]->randomizeEnabled = false;
         lightDiv.setDivision (64);
     }
 
     void returnOf (int lId, int rId, float& l, float& r)   // a stereo return, R normalled to L
     {
-        l = scale::clampV (inputs[lId].getVoltage());
-        r = inputs[rId].isConnected() ? scale::clampV (inputs[rId].getVoltage()) : l;
+        l = mixer::finite (inputs[lId].getVoltage());
+        r = inputs[rId].isConnected() ? mixer::finite (inputs[rId].getVoltage()) : l;
     }
 
     void process (const ProcessArgs& args) override

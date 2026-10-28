@@ -1030,6 +1030,14 @@ void testMixer()
         const float nan = std::numeric_limits<float>::quiet_NaN();
         s.process (nan, nan, true, mixer::unityKnob, 0.f, true, 0.f, 0.f, step, ol, orr, pl, pr);
         check (ol == 0.f && orr == 0.f && pl == 0.f && pr == 0.f, "mixer: NaN in reads as 0 V");
+        {
+            mixer::Strip h;
+            for (int i = 0; i < 480; ++i) h.process (15.f, 15.f, true, mixer::unityKnob, 0.f, true, 0.f, 0.f, step, ol, orr, pl, pr);
+            check (near (pl, 15.f) && near (ol, 15.f, 1e-3), "mixer: a hot input (15 V, e.g. a summed poly cable) is not clipped before LEVEL", pl);
+            const float inf = std::numeric_limits<float>::infinity();
+            h.process (inf, inf, true, mixer::unityKnob, 0.f, true, 0.f, 0.f, step, ol, orr, pl, pr);
+            check (pl == 0.f && pr == 0.f, "mixer: an infinite input reads as 0 V");
+        }
         for (int i = 0; i < 480; ++i) s.process (1.f, 1.f, false, mixer::unityKnob, 1.f, true, 0.f, 0.f, step, ol, orr, pl, pr);
         check (near (ol, 0.f) && near (orr, 1.f, 1e-3), "mixer: strip follows a PAN move (cached gains refresh)", ol);
         for (int i = 0; i < 480; ++i) s.process (1.f, 1.f, false, mixer::unityKnob, 0.f, true, 0.f, 0.f, step, ol, orr, pl, pr);
