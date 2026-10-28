@@ -67,8 +67,6 @@ struct Strip
         outL = preL * gl;
         outR = preR * gr;
     }
-
-    void reset() { gl = gr = 0.f; }
 };
 
 // The shared sidechain envelope, 0..1. Follower: |x| / 5 V rises to its level linearly within 1 ms, falls by
