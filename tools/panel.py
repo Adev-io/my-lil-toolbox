@@ -21,9 +21,10 @@ FONT = os.environ.get('RACK_FONT', r'C:\Program Files\VCV\Rack2Free\res\fonts\De
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # Radius in mm per kind, from the Rack component SVGs: hero Rogan3PS, knob Rogan1PS, tiny BefacoTinyKnob (8.6 mm), key VCVLightBezelLatch (7.2 mm),
-# button VCVButton / VCVLightLatch (6.1 mm), light SmallSimpleLight, out = output jack. Input jacks by role, ring coloured
-# as in My lil Acid Bass: seq = clock / reset / triggers (blue), play = pitch (lime), cv = modulation (magenta)
-RADIUS = {'hero': 8.8, 'knob': 6.7, 'tiny': 4.3, 'trim': 3.0, 'key': 3.6, 'button': 3.1, 'light': 1.0, 'seq': 4.0, 'play': 4.0, 'cv': 4.0, 'out': 4.0}
+# button VCVButton / VCVLightLatch (6.1 mm), light SmallSimpleLight, out = output jack, face = a TalkingFace the band's size.
+# Input jacks by role, ring coloured as in My lil Acid Bass: seq = clock / reset / triggers (blue), play = pitch (lime), cv = modulation (magenta)
+RADIUS = {'hero': 8.8, 'knob': 6.7, 'tiny': 4.3, 'trim': 3.0, 'key': 3.6, 'button': 3.1, 'light': 1.0, 'seq': 4.0, 'play': 4.0, 'cv': 4.0, 'out': 4.0,
+          'face': BAND * 0.36}
 LABEL_SIZE = {'hero': 3.0, 'knob': 2.6, 'tiny': 2.4, 'trim': 2.2, 'button': 2.4, 'light': 2.0, 'seq': 2.4, 'play': 2.4, 'cv': 2.4, 'out': 2.6}
 RING_COLOR = {'seq': BLUE, 'play': LIME, 'cv': MAGENTA}
 PAD_R = 4.8   # dark plate behind an output jack
@@ -59,7 +60,7 @@ def text(s, x, y, size, fill, anchor='middle', stroke=0.0):
 TITLE_X, TITLE_Y, TITLE_SIZE = 11.2, 6.3, 4.3
 MASCOT_X = W - 14.46   # 46.5 on 12 HP
 MASCOT_R = BAND * 0.36
-HP = {'Slider': 18, 'Ripple': 16, 'Mixer': 26}   # panel width per module, 12 HP unless named here
+HP = {'Slider': 18, 'Ripple': 16, 'Mixer': 34}   # panel width per module, 12 HP unless named here
 
 
 def use(name):
@@ -226,8 +227,9 @@ SLIDER = [part for sec in (0, 1) for i, x in enumerate(SX) for part in (
 ]
 
 
-def slider_box(x, y):
-    w, h = SLIDER_BOX
+def box_of(kind, x, y):
+    """(x0, y0, x1, y1) of a box kind (BOX) centred on its entry."""
+    w, h = BOX[kind]
     return x - w / 2, y - h / 2, x + w / 2, y + h / 2
 
 
@@ -241,38 +243,52 @@ def slider_extras():
     ]
 
 
-# ---- Mixer (26 HP): eight strip columns (SEND 1, SEND 2, DUCK, PAN, LEVEL fader, signal light, MUTE, SOLO, IN L, IN R),
-# rows captioned in the left margin, strip numbers on top; the master section right of a divider. Built on its own
-# width MW, never the global W. Strip parts carry no labels: the captions and numbers name them.
+# ---- Mixer (34 HP): eight strip columns (face over the strip number, SEND 1, SEND 2, DUCK, PAN, LEVEL fader with the LED
+# meter and the duck bar right of it, MUTE, SOLO, IN L, IN R), rows captioned in the left margin; the master section right
+# of a divider: the display, then MASTER / REL / SC, the returns, the sends, OUT. Built on its own width MW, never the
+# global W. Strip parts carry no labels: the captions and numbers name them.
 MW = 5.08 * HP['Mixer']
-STRIP_DX = 11.0
-MIX_X = [10.5 + STRIP_DX * i for i in range(8)]   # strip columns, 11 mm apart (the widget steps by STRIP_DX from strip 0)
-ROW_S1, ROW_S2, ROW_DUCK, ROW_PAN, ROW_LEVEL = 19.0, 28.8, 38.6, 48.4, 67.5
-ROW_SIG, ROW_MUTE, ROW_SOLO, ROW_INL, ROW_INR = 83.0, 87.8, 95.0, 106.0, 117.6
-MC = (101.0, 112.0, 123.0)   # master columns
+STRIP_DX = 13.5
+MIX_X = [11.0 + STRIP_DX * i for i in range(8)]   # strip columns, 13.5 mm apart (the widget steps by STRIP_DX from strip 0)
+ROW_FACE, ROW_NUM = 13.0, 19.6   # a strip's face, and its number's baseline under it
+ROW_S1, ROW_S2, ROW_DUCK, ROW_PAN, ROW_LEVEL = 24.8, 33.8, 42.8, 51.8, 70.5
+ROW_MUTE, ROW_SOLO, ROW_INL, ROW_INR = 87.0, 93.6, 106.0, 117.6
+METER_BOX = (2.2, SLIDER_BOX[1])   # LED ladder, its clip dot on top; 0.34 mm right of the fader
+DUCK_BOX = (1.0, SLIDER_BOX[1])    # the duck bar, 0.4 mm right of the ladder
+METER_DX = SLIDER_BOX[0] / 2 + 0.34 + METER_BOX[0] / 2   # box centres right of the strip column
+DUCK_DX = METER_DX + METER_BOX[0] / 2 + 0.4 + DUCK_BOX[0] / 2
+DISPLAY_BOX = (51.0, 31.0)   # the master display (MasterDisplay)
+BOX = {'slider': SLIDER_BOX, 'meter': METER_BOX, 'duck': DUCK_BOX, 'display': DISPLAY_BOX}   # kinds that are boxes (w, h), centred on their entry
+MC = (121.0, 133.0, 145.0, 157.0)   # master columns
+ROW_MASTER, ROW_RTN, ROW_SND, ROW_OUT = 52.0, 72.0, 88.0, 110.0
+ROW_SC = 56.5   # REL and SC: their own row (not MASTER's, whose hero knob sets the row's label baseline), so their labels sit right under them, level with MASTER's (64.0)
 MIXER_ZONE_Y = 100.0
 MIXER = [part for i, x in enumerate(MIX_X) for part in (
+    ('STRIP_FACE%d' % i, 'face', x, ROW_FACE, ''),
     ('SEND1_%d_PARAM' % i, 'tiny', x, ROW_S1, ''), ('SEND2_%d_PARAM' % i, 'tiny', x, ROW_S2, ''),
     ('DUCK%d_PARAM' % i, 'tiny', x, ROW_DUCK, ''), ('PAN%d_PARAM' % i, 'tiny', x, ROW_PAN, ''),
-    ('LEVEL%d_PARAM' % i, 'slider', x, ROW_LEVEL, ''), ('SIGNAL%d_LIGHT' % i, 'light', x, ROW_SIG, ''),
+    ('LEVEL%d_PARAM' % i, 'slider', x, ROW_LEVEL, ''),
+    ('METER%d' % i, 'meter', x + METER_DX, ROW_LEVEL, ''), ('DUCKBAR%d' % i, 'duck', x + DUCK_DX, ROW_LEVEL, ''),
     ('MUTE%d_PARAM' % i, 'button', x, ROW_MUTE, ''), ('SOLO%d_PARAM' % i, 'button', x, ROW_SOLO, ''),
     ('L%d_INPUT' % i, 'play', x, ROW_INL, ''), ('R%d_INPUT' % i, 'play', x, ROW_INR, ''))] + [
-    ('MASTER_PARAM', 'hero', (MC[0] + MC[1]) / 2, 22.0, 'MASTER'), ('RELEASE_PARAM', 'tiny', MC[2], 22.0, 'REL'),
-    ('SC_INPUT', 'seq', MC[0], 44.0, 'SC'),
-    ('RETURN1_L_INPUT', 'play', MC[1], 44.0, 'RTN1 L'), ('RETURN1_R_INPUT', 'play', MC[2], 44.0, 'RTN1 R'),
-    ('RETURN2_L_INPUT', 'play', MC[1], 59.5, 'RTN2 L'), ('RETURN2_R_INPUT', 'play', MC[2], 59.5, 'RTN2 R'),
-    ('SEND1_L_OUTPUT', 'out', MC[1], 75.0, 'SND1 L'), ('SEND1_R_OUTPUT', 'out', MC[2], 75.0, 'SND1 R'),
-    ('SEND2_L_OUTPUT', 'out', MC[1], 90.5, 'SND2 L'), ('SEND2_R_OUTPUT', 'out', MC[2], 90.5, 'SND2 R'),
-    ('OUT_L_OUTPUT', 'out', MC[1], 110.0, 'OUT L'), ('OUT_R_OUTPUT', 'out', MC[2], 110.0, 'OUT R'),
+    ('DISPLAY', 'display', 142.0, 26.5, ''),
+    ('MASTER_PARAM', 'hero', (MC[0] + MC[1]) / 2, ROW_MASTER, 'MASTER'), ('RELEASE_PARAM', 'tiny', MC[2], ROW_SC, 'REL'),
+    ('SC_INPUT', 'seq', MC[3], ROW_SC, 'SC'),
+    ('RETURN1_L_INPUT', 'play', MC[0], ROW_RTN, 'RTN1 L'), ('RETURN1_R_INPUT', 'play', MC[1], ROW_RTN, 'RTN1 R'),
+    ('RETURN2_L_INPUT', 'play', MC[2], ROW_RTN, 'RTN2 L'), ('RETURN2_R_INPUT', 'play', MC[3], ROW_RTN, 'RTN2 R'),
+    ('SEND1_L_OUTPUT', 'out', MC[0], ROW_SND, 'SND1 L'), ('SEND1_R_OUTPUT', 'out', MC[1], ROW_SND, 'SND1 R'),
+    ('SEND2_L_OUTPUT', 'out', MC[2], ROW_SND, 'SND2 L'), ('SEND2_R_OUTPUT', 'out', MC[3], ROW_SND, 'SND2 R'),
+    ('OUT_L_OUTPUT', 'out', MC[1], ROW_OUT, 'OUT L'), ('OUT_R_OUTPUT', 'out', MC[2], ROW_OUT, 'OUT R'),
 ]
+DIVIDER_X = (MIX_X[-1] + DUCK_DX + DUCK_BOX[0] / 2 + MC[0] - PAD_R) / 2   # centred between strip 8's duck bar and the master's plates
 
 
 def mixer_extras():
     return [
         '<rect x="%g" y="%g" width="%g" height="23.7" rx="2" fill="%s"/>' % (ZONE_X, MIXER_ZONE_Y, MW - 2 * ZONE_X, INK2),   # jack zone, bottom at 123.7
-        '<rect x="%g" y="14.6" width="0.4" height="83" fill="%s"/>' % ((MIX_X[-1] + MC[0]) / 2 - 0.2, DIM),   # divider: the master section, centred between strip 8 and the master columns
+        '<rect x="%g" y="11" width="0.4" height="86.6" fill="%s"/>' % (DIVIDER_X - 0.2, DIM),   # divider: the master section
     ] + ['<rect x="%g" y="%g" width="4.2" height="%g" rx="1" fill="%s"/>' % (x - 2.1, ROW_LEVEL - SLIDER_BOX[1] / 2, SLIDER_BOX[1], INK2)
-         for x in MIX_X] + [text(str(i + 1), x, 13.6, 2.8, LIME, stroke=0.2) for i, x in enumerate(MIX_X)] + [
+         for x in MIX_X] + [text(str(i + 1), x, ROW_NUM, 2.8, LIME, stroke=0.2) for i, x in enumerate(MIX_X)] + [
         (text(s, 3.4, y + 0.8, 2.2, DIM) if len(s) == 1 else caption(s, y))   # one letter reads upright, longer words upwards
         for s, y in (('SEND 1', ROW_S1), ('SEND 2', ROW_S2), ('DUCK', ROW_DUCK), ('PAN', ROW_PAN), ('LEVEL', ROW_LEVEL),
                                    ('M', ROW_MUTE), ('S', ROW_SOLO), ('L', ROW_INL), ('R', ROW_INR))]
@@ -282,7 +298,11 @@ MODULES = {'Arpeggio': ('MY LIL ARPEGGIO', ARPEGGIO, arpeggio_extras, ARPEGGIO_Z
            'Filter': ('MY LIL FILTER', FILTER, filter_extras, FILTER_ZONE_Y), 'Slider': ('MY LIL SLIDER', SLIDER, slider_extras, SLIDER_ZONE_Y),
            'Mixer': ('MY LIL MIXER', MIXER, mixer_extras, MIXER_ZONE_Y)}
 EXTRA_CONSTS = {'Mixer': ['constexpr float STRIP_DX = %.2ff;   // strip column pitch: strip i sits at strip 0 + i * STRIP_DX' % STRIP_DX,
-                          'constexpr int STRIPS = %d;   // strip count; Mixer.cpp static_asserts it equals mixer::numStrips' % len(MIX_X)]}
+                          'constexpr int STRIPS = %d;   // strip count; Mixer.cpp static_asserts it equals mixer::numStrips' % len(MIX_X),
+                          'constexpr float STRIP_FACE_R = %.3ff;   // a strip face\'s radius (TalkingFace); STRIP_FACEi is its centre' % RADIUS['face'],
+                          'constexpr float METER_SIZE[2] = {%.2ff, %.2ff};   // LED ladder box w, h (StripMeter); METERi is its centre' % METER_BOX,
+                          'constexpr float DUCKBAR_SIZE[2] = {%.2ff, %.2ff};   // duck bar box w, h; DUCKBARi is its centre' % DUCK_BOX,
+                          'constexpr float DISPLAY_SIZE[2] = {%.2ff, %.2ff};   // master display w, h (MasterDisplay); DISPLAY is its centre' % DISPLAY_BOX]}
 
 
 def reach(kind):
@@ -290,10 +310,10 @@ def reach(kind):
 
 
 def rowmax_of(layout):
-    """Each row's biggest part other than outputs, lights, keys and sliders: labels in a row share one baseline set by it."""
+    """Each row's biggest part other than outputs, lights, keys and boxes: labels in a row share one baseline set by it."""
     rowmax = {}
     for _, kind, x, y, _ in layout:
-        if kind not in ('out', 'light', 'key', 'slider'):
+        if kind not in ('out', 'light', 'key') and kind not in BOX:
             rowmax[y] = max(rowmax.get(y, 0), reach(kind))
     return rowmax
 
@@ -332,10 +352,10 @@ def boxes_hit(a, b):
 def problems(layout, title, zone_y):
     """Everything on the panel that touches something else or leaves the panel: parts (rings and plates included),
     their labels, the band's title and face, Rack's four screws. Parts that reach below the jack zone's top (zone_y) must stay
-    inside the zone's side margin. Sliders are boxes (SLIDER_BOX), the rest circles. Must be empty. Captions are extras and not checked."""
+    inside the zone's side margin. Sliders, meters and displays are boxes (BOX), the rest circles. Must be empty. Captions are extras and not checked."""
     bad = []
-    parts = [(n, x, y, reach(k)) for n, k, x, y, _ in layout if k != 'slider']
-    rects = [(n, slider_box(x, y)) for n, k, x, y, _ in layout if k == 'slider']
+    parts = [(n, x, y, reach(k)) for n, k, x, y, _ in layout if k not in BOX]
+    rects = [(n, box_of(k, x, y)) for n, k, x, y, _ in layout if k in BOX]
     for a, box in rects:
         if box[1] < BAND:
             bad.append('%s enters the band' % a)
@@ -389,6 +409,11 @@ def panel(title, layout, extras):
             out.append('<circle cx="%g" cy="%g" r="%g" fill="none" stroke="%s" stroke-width="0.5"/>' % (x, y, RING_R, RING_COLOR[kind]))
         elif kind == 'out':
             out.append('<circle cx="%g" cy="%g" r="%g" fill="%s" stroke="%s" stroke-width="0.5"/>' % (x, y, PAD_R, INK, LIME))
+        elif kind == 'face':
+            out.append(mascot(x, y, RADIUS['face']))
+        elif kind in BOX and kind != 'slider':   # meter and display backing: the widget draws over it
+            x0, y0, x1, y1 = box_of(kind, x, y)
+            out.append('<rect x="%g" y="%g" width="%g" height="%g" rx="0.6" fill="%s"/>' % (x0, y0, x1 - x0, y1 - y0, INK2))
         if label:
             base, size, colour, stroke = label_at(kind, y, rowmax)
             out.append(text(label, x, base, size, colour, stroke=stroke))

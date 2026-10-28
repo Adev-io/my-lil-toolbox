@@ -95,12 +95,23 @@ and play a pitch CV into A CV for one pass to capture a line.
 
 ## My lil Mixer
 
-Eight stereo strips into a master bus, with two sends and returns and one sidechain that ducks every strip. 26 HP.
+Eight stereo strips into a master bus, with two sends and returns, one sidechain that ducks every strip, and meters
+that show what reaches the audio interface. 34 HP.
 
 - Per strip: inputs **L** and **R** (unpatched R copies L; poly cables are summed, with no clipping before LEVEL), **LEVEL** fader (0 dB at the default,
   +6 dB at the top), **PAN** (a mono source pans at constant power, a stereo source balances), **SEND 1** and **SEND 2**,
-  **DUCK**, **M** (mute) and **S** (solo). Any solo plays only the soloed strips; mute always wins. The light over M
-  shows the strip's level, magenta when it runs above 5 V.
+  **DUCK**, **M** (mute) and **S** (solo). Any solo plays only the soloed strips; mute always wins.
+- Meters read **dBFS against 10 V**: 10 V is 0 dBFS, the level Rack's Audio module sends to the interface as full scale.
+  Beside each fader: an LED ladder of the strip's input (before LEVEL and the duck, so a muted or turned-down strip still
+  shows what arrives), -60 to 0 dBFS, lime below -6 dBFS (5 V), magenta above, a white tick holding each peak for 1.5 s;
+  the dot on top latches magenta when the input reaches 10 V (click the meter to clear it); and a blue bar showing how
+  far the sidechain pulls the strip down right now (0 to -24 dB). The face over each strip talks with what the strip
+  sends on (after LEVEL, mute and the duck: a muted strip keeps a straight face).
+- The display over the master: OUT L and R after the soft clip on the same ladders, with the master clip dot (it
+  latches only with **Master soft clip** off: the soft clip tops out at 8 V, about -1.9 dBFS); their
+  peak-hold readouts in dBFS; the short-term loudness (LUFS over 3 s, K-weighted as in BS.1770); and the master's last
+  6 s of peaks, kicks standing tall and ducks showing as notches. Click the display to clear the master's and every
+  strip's clip latch; Initialize clears them too, and drops the meter bars, peak ticks, loudness and history.
 - **SC** feeds the sidechain: each strip's **DUCK** sets how far it is pulled down when the sidechain hits, **REL** how
   fast it comes back (20 ms to 1 s). Patch the kick into SC and turn up DUCK on the bass and pads for the house pump;
   leave the kick's own strip at 0.

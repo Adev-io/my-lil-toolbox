@@ -1,5 +1,5 @@
 // Mixer.h: My lil Mixer's DSP. The LEVEL taper, pan and balance, the mute/solo rule, one strip (duck, slewed gains,
-// pre-fader send tap), the shared sidechain envelope (audio follower or trigger shape), the strip peak meter and the master
+// pre-fader send tap), the shared sidechain envelope (audio follower or trigger shape), and the master
 // soft clip. No Rack headers.
 // Author: Ari Klopfer / A_Development · MIT
 #pragma once
@@ -10,7 +10,7 @@ namespace mixer
 {
 constexpr int numStrips = 8;
 constexpr float unityKnob = 0.70710678f;   // the LEVEL / MASTER knob position for 0 dB
-constexpr float hotV = 5.f;                // signal light turns magenta above this; soft clip starts here
+constexpr float hotV = 5.f;                // soft clip starts here
 
 inline float finite (float v) { return std::isfinite (v) ? v : 0.f; }   // NaN / inf read as 0 V; no ±10 V clamp, so a hot or summed input keeps its shape
 
@@ -112,10 +112,6 @@ struct Sidechain
 // The RELEASE knob 0..1 -> seconds, log: 20 ms at 0, 1 s at 1. knobOfRelease inverts it.
 inline float releaseOf (float knob) { return 0.02f * std::pow (50.f, knob); }
 inline float knobOfRelease (float sec) { return std::log (sec / 0.02f) / std::log (50.f); }
-
-// Peak meter with ~100 ms fall. coef = peakCoef (dt), computed once per sample rate.
-inline float peakCoef (float dt) { return std::exp (-dt / 0.1f); }
-inline float peak (float held, float x, float coef) { const float a = std::fabs (x); return a > held * coef ? a : held * coef; }
 
 // Master soft clip: identity up to 5 V, then a tanh knee with a ceiling of 8 V; slope 1 at the knee, so no corner.
 inline float softClip (float x)

@@ -10,6 +10,7 @@
 #include "Env.h"
 #include "Slider.h"
 #include "Mixer.h"
+#include "Meter.h"
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
@@ -1105,17 +1106,151 @@ void testMixer()
     }
     check (near (mixer::releaseOf (0.f), 0.02) && near (mixer::releaseOf (1.f), 1.0, 1e-4) && near (mixer::releaseOf (mixer::knobOfRelease (0.15f)), 0.15, 1e-4),
            "mixer: RELEASE knob is 20 ms .. 1 s, log, and knobOfRelease inverts it");
-    {
-        const float c = mixer::peakCoef (dt);
-        float p = mixer::peak (0.f, -6.f, c);
-        check (p == 6.f, "mixer: peak catches the magnitude", p);
-        for (int i = 0; i < 4800; ++i) p = mixer::peak (p, 0.f, c);
-        check (near (p, 6.0 * std::exp (-1.0), 1e-3), "mixer: peak falls to 1/e in 100 ms", p);
-    }
     check (mixer::softClip (4.9f) == 4.9f && mixer::softClip (-5.f) == -5.f, "mixer: soft clip is the identity up to 5 V");
     check (near ((mixer::softClip (5.001f) - 5.f) / 0.001f, 1.0, 1e-2), "mixer: soft clip has slope 1 at the knee", mixer::softClip (5.001f));
     check (mixer::softClip (100.f) <= 8.f && mixer::softClip (-100.f) >= -8.f && mixer::softClip (100.f) > 7.9f && mixer::softClip (6.f) < 6.f, "mixer: soft clip bends above 5 V and never passes 8 V", mixer::softClip (100.f));
     check (mixer::softClip (std::numeric_limits<float>::quiet_NaN()) == 0.f, "mixer: soft clip NaN reads as 0 V");
+}
+
+// Short-term loudness of a sine (997 Hz unless named), `volts` peak, in L (and R when `both`), `sec` seconds into a fresh meter.
+float sineLufs (float sr, float volts, bool both, double sec, double hz = 997.0)
+{
+    meter::Loudness m;
+    m.setRate (sr);
+    for (int i = 0; i < (int) (sec * sr); ++i)
+    {
+        const float v = volts * (float) std::sin (2.0 * 3.141592653589793 * hz * i / sr);
+        m.process (v, both ? v : 0.f);
+    }
+    return m.value;
+}
+
+void testMeter()
+{
+    const float nan = std::numeric_limits<float>::quiet_NaN(), inf = std::numeric_limits<float>::infinity();
+    check (meter::dbfs (10.f) == 0.f && meter::dbfs (-10.f) == 0.f, "meter: 10 V (either sign) is 0 dBFS", meter::dbfs (-10.f));
+    check (near (meter::dbfs (5.f), -6.02, 0.01), "meter: 5 V is -6.02 dBFS", meter::dbfs (5.f));
+    check (meter::dbfs (0.f) == -60.f && meter::dbfs (1e-4f) == -60.f, "meter: silence and -100 dBFS read the -60 floor", meter::dbfs (1e-4f));
+    check (meter::dbfs (nan) == -60.f && meter::dbfs (inf) == -60.f, "meter: NaN and inf read the floor");
+    {
+        const float dt = 64.f / 48000.f;   // the module runs the meters every 64 samples
+        meter::Ballistics b;
+        b.process (-3.f, dt);
+        check (b.level == -3.f && b.hold == -3.f, "meter: bar and tick rise at once", b.level);
+        b.process (0.f, dt);
+        for (int i = 0; i < 750; ++i) b.process (-60.f, dt);   // 1 s
+        check (near (b.level, -20.0, 0.01), "meter: the bar falls 20 dB in 1 s of silence", b.level);
+        for (int i = 0; i < 300; ++i) b.process (-60.f, dt);   // 1.4 s
+        check (b.hold == 0.f, "meter: the tick holds the peak at 1.4 s", b.hold);
+        for (int i = 0; i < 450; ++i) b.process (-60.f, dt);   // 2 s
+        check (near (b.hold, -10.0, 0.1), "meter: after 1.5 s the tick falls at 20 dB/s (-10 at 2 s)", b.hold);
+        for (int i = 0; i < 3000; ++i) b.process (-60.f, dt);
+        check (b.level == -60.f && b.hold == -60.f, "meter: bar and tick settle on the floor", b.hold);
+    }
+    {
+        meter::ClipLatch c;
+        c.process (9.99f);
+        check (! c.on, "meter: 9.99 V does not latch the clip");
+        c.process (10.f);
+        c.process (0.f);
+        check (c.on, "meter: 10 V latches the clip, and it stays after the peak");
+        c.clear();
+        check (! c.on, "meter: clear resets the latch");
+        c.process (12.f);
+        check (c.on, "meter: the latch sets again after a clear");
+    }
+    {
+        const float want[meter::segments] = { -60.f, -54.f, -48.f, -42.f, -36.f, -30.f, -27.f, -24.f, -21.f, -18.f, -15.f, -12.f, -9.f, -6.f, -4.f, -2.f };
+        bool steps = true;
+        int hotCount = 0;
+        for (int i = 0; i < meter::segments; ++i)
+        {
+            steps = steps && meter::lit (want[i]) == i && meter::lit (want[i] + 0.01f) == i + 1;
+            hotCount += meter::hot (i) ? 1 : 0;
+        }
+        check (steps && meter::lit (nan) == 0, "meter: ladder segments start at -60 -54 -48 -42 -36 -30 -27 -24 -21 -18 -15 -12 -9 -6 -4 -2");
+        check (! meter::hot (12) && meter::hot (13) && hotCount == 3, "meter: ladder colour edge at -6 dBFS: 13 lime segments, 3 magenta", hotCount);
+        check (meter::lit (0.f) == 16 && meter::lit (6.f) == 16 && meter::ladderPos (0.f) == 16.f && meter::ladderPos (6.f) == 16.f,
+               "meter: 0 dBFS is the top of the ladder");
+        check (meter::ladderPos (-60.f) == 0.f && meter::ladderPos (-6.f) == 13.f && near (meter::ladderPos (-5.f), 13.5) && near (meter::ladderPos (-33.f), 4.5),
+               "meter: the tick's height follows the ladder's segments", meter::ladderPos (-5.f));
+    }
+    {
+        meter::Biquad s, h;
+        meter::kWeight (48000.0, s, h);
+        check (near (s.b0, 1.53512485958697, 1e-6) && near (s.b1, -2.69169618940638, 1e-6) && near (s.b2, 1.19839281085285, 1e-6)
+               && near (s.a1, -1.69065929318241, 1e-6) && near (s.a2, 0.73248077421585, 1e-6), "meter: K-weight shelf at 48 kHz is BS.1770-4's", s.b0);
+        check (h.b0 == 1.0 && h.b1 == -2.0 && h.b2 == 1.0 && near (h.a1, -1.99004745483398, 1e-6) && near (h.a2, 0.99007225036621, 1e-6),
+               "meter: K-weight high-pass at 48 kHz is BS.1770-4's", h.a1);
+    }
+    for (float sr : { 44100.f, 48000.f, 96000.f })
+    {
+        const float both = sineLufs (sr, 10.f, true, 3.5), one = sineLufs (sr, 10.f, false, 3.5);
+        check (near (both, 0.0, 0.1), sr < 45000.f ? "meter: full-scale 997 Hz sine in L and R is 0.0 LUFS (44.1 kHz)" : sr < 50000.f ? "meter: full-scale 997 Hz sine in L and R is 0.0 LUFS (48 kHz)" : "meter: full-scale 997 Hz sine in L and R is 0.0 LUFS (96 kHz)", both);
+        check (near (one, -3.01, 0.1), sr < 45000.f ? "meter: the sine in one channel is -3.01 LUFS (44.1 kHz)" : sr < 50000.f ? "meter: the sine in one channel is -3.01 LUFS (48 kHz)" : "meter: the sine in one channel is -3.01 LUFS (96 kHz)", one);
+    }
+    {
+        const float lo48 = sineLufs (48000.f, 10.f, true, 3.5, 50.0), lo96 = sineLufs (96000.f, 10.f, true, 3.5, 50.0);
+        std::printf ("      meter measured: 50 Hz full-scale sine, L and R: %.3f LUFS at 48 kHz, %.3f at 96 kHz\n", lo48, lo96);
+        check (lo48 < -1.0 && near (lo96, lo48, 0.05), "meter: K-weighting cuts 50 Hz the same at 96 kHz as at 48 kHz", lo96 - lo48);
+    }
+    {
+        meter::Loudness m;
+        m.setRate (48000.f);
+        int i = 0;
+        auto run = [&] (double sec, float volts)
+        {
+            for (const int end = i + (int) (sec * 48000); i < end; ++i)
+            {
+                const float v = volts * (float) std::sin (2.0 * 3.141592653589793 * 997.0 * i / 48000.0);
+                m.process (v, v);
+            }
+        };
+        run (1.5, 10.f);
+        check (near (m.value, -3.01, 0.1), "meter: LUFS window is 3 s: 1.5 s of the sine from silence reads -3.01", m.value);
+        run (1.5, 10.f);
+        run (1.5, 0.f);
+        check (near (m.value, -3.01, 0.1), "meter: silence lowers the window: 1.5 s after 3 s of the sine reads -3.01", m.value);
+        run (1.6, 0.f);   // 3.1 s: the first silent block still holds the filters' ring-out after the cut
+        check (m.value == -60.f, "meter: 3.1 s of silence reads the floor", m.value);
+        m.process (nan, inf);
+        run (3.0, 10.f);
+        check (near (m.value, 0.0, 0.1), "meter: a NaN or inf sample does not poison the loudness", m.value);
+    }
+    {
+        meter::Loudness m;
+        m.setRate (48000.f);
+        for (int i = 0; i < 48000; ++i)
+        {
+            const float v = 10.f * (float) std::sin (2.0 * 3.141592653589793 * 997.0 * i / 48000.0);
+            m.process (v, v);
+        }
+        const float before = m.value;
+        m.setRate (96000.f);
+        bool zero = true;
+        for (int c = 0; c < 2; ++c)
+            zero = zero && m.shelf[c].z1 == 0.0 && m.shelf[c].z2 == 0.0 && m.hp[c].z1 == 0.0 && m.hp[c].z2 == 0.0;
+        check (before > -10.f && m.value == -60.f && zero, "meter: a sample-rate change resets the LUFS filters and window", m.value);
+    }
+    {
+        meter::History h;
+        h.setRate (1000.f);   // 50 samples per column
+        for (int i = 0; i < 50; ++i) h.process (i == 7 ? -10.f : 1.f);
+        check (h.head == 1 && h.col[0] == 0.f, "meter: a history column is its 50 ms peak (a one-sample -10 V spike reads 0 dBFS)", h.col[0]);
+        for (int i = 0; i < 49; ++i) h.process (5.f);
+        const bool open = h.head == 1;
+        h.process (5.f);
+        check (open && h.head == 2 && near (h.col[1], -6.02, 0.01), "meter: a history column closes after 50 ms, not before", h.col[1]);
+        for (int i = 0; i < 118 * 50; ++i) h.process (0.f);
+        const bool full = h.head == 0 && h.col[0] == 0.f && h.col[119] == -60.f;
+        for (int i = 0; i < 50; ++i) h.process (1.f);
+        check (full && h.head == 1 && near (h.col[0], -20.0, 1e-3) && near (h.col[1], -6.02, 0.01), "meter: history holds 120 columns (6 s), then wraps over the oldest", h.head);
+        h.setRate (48000.f);
+        check (h.per == 2400, "meter: a history column at 48 kHz is 2400 samples", h.per);
+    }
+    check (near (meter::duckDb (0.5f, 1.f), -6.02, 0.01), "meter: DUCK 0.5 at full envelope is -6.02 dB", meter::duckDb (0.5f, 1.f));
+    check (meter::duckDb (0.f, 1.f) == 0.f && meter::duckDb (1.f, 0.f) == 0.f, "meter: DUCK 0, or no envelope, is 0 dB");
+    check (near (meter::duckDb (0.9f, 1.f), -20.0, 0.01) && meter::duckDb (1.f, 1.f) == -24.f, "meter: the duck bar bottoms out at -24 dB", meter::duckDb (1.f, 1.f));
 }
 
 int main()
@@ -1145,6 +1280,7 @@ int main()
     testLadderSafety();
     testEnv();
     testMixer();
+    testMeter();
     // ---- calls (each task adds its calls above this line)
     std::printf ("\n%s: %d failure(s)\n", failures ? "FAILED" : "PASSED", failures);
     return failures ? 1 : 0;
