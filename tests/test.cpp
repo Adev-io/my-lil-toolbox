@@ -1190,11 +1190,11 @@ void testMeter()
         check (h.b0 == 1.0 && h.b1 == -2.0 && h.b2 == 1.0 && near (h.a1, -1.99004745483398, 1e-6) && near (h.a2, 0.99007225036621, 1e-6),
                "meter: K-weight high-pass at 48 kHz is BS.1770-4's", h.a1);
     }
-    for (float sr : { 48000.f, 96000.f })
+    for (float sr : { 44100.f, 48000.f, 96000.f })
     {
         const float both = sineLufs (sr, 10.f, true, 3.5), one = sineLufs (sr, 10.f, false, 3.5);
-        check (near (both, 0.0, 0.1), sr < 50000.f ? "meter: full-scale 997 Hz sine in L and R is 0.0 LUFS (48 kHz)" : "meter: full-scale 997 Hz sine in L and R is 0.0 LUFS (96 kHz)", both);
-        check (near (one, -3.01, 0.1), sr < 50000.f ? "meter: the sine in one channel is -3.01 LUFS (48 kHz)" : "meter: the sine in one channel is -3.01 LUFS (96 kHz)", one);
+        check (near (both, 0.0, 0.1), sr < 45000.f ? "meter: full-scale 997 Hz sine in L and R is 0.0 LUFS (44.1 kHz)" : sr < 50000.f ? "meter: full-scale 997 Hz sine in L and R is 0.0 LUFS (48 kHz)" : "meter: full-scale 997 Hz sine in L and R is 0.0 LUFS (96 kHz)", both);
+        check (near (one, -3.01, 0.1), sr < 45000.f ? "meter: the sine in one channel is -3.01 LUFS (44.1 kHz)" : sr < 50000.f ? "meter: the sine in one channel is -3.01 LUFS (48 kHz)" : "meter: the sine in one channel is -3.01 LUFS (96 kHz)", one);
     }
     {
         const float lo48 = sineLufs (48000.f, 10.f, true, 3.5, 50.0), lo96 = sineLufs (96000.f, 10.f, true, 3.5, 50.0);
@@ -1223,6 +1223,21 @@ void testMeter()
         m.process (nan, inf);
         run (3.0, 10.f);
         check (near (m.value, 0.0, 0.1), "meter: a NaN or inf sample does not poison the loudness", m.value);
+    }
+    {
+        meter::Loudness m;
+        m.setRate (48000.f);
+        for (int i = 0; i < 48000; ++i)
+        {
+            const float v = 10.f * (float) std::sin (2.0 * 3.141592653589793 * 997.0 * i / 48000.0);
+            m.process (v, v);
+        }
+        const float before = m.value;
+        m.setRate (96000.f);
+        bool zero = true;
+        for (int c = 0; c < 2; ++c)
+            zero = zero && m.shelf[c].z1 == 0.0 && m.shelf[c].z2 == 0.0 && m.hp[c].z1 == 0.0 && m.hp[c].z2 == 0.0;
+        check (before > -10.f && m.value == -60.f && zero, "meter: a sample-rate change resets the LUFS filters and window", m.value);
     }
     {
         meter::History h;

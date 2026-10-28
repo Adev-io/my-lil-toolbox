@@ -79,7 +79,7 @@ inline float duckDb (float duck, float env)
     return g > 0.f ? std::fmax (duckFloorDb, 20.f * std::log10 (g)) : duckFloorDb;
 }
 
-// One biquad, transposed direct form II, in double: the 38 Hz high-pass keeps its poles near 1.
+// One biquad, transposed direct form II, in double: the 38 Hz high-pass keeps its poles near 1. A decaying high-pass can sit in denormals when FTZ is off; Rack's engine threads set FTZ/DAZ and the plugin relies on that.
 struct Biquad
 {
     double b0 = 1, b1 = 0, b2 = 0, a1 = 0, a2 = 0, z1 = 0, z2 = 0;
