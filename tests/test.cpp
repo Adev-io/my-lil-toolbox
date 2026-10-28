@@ -991,8 +991,10 @@ void testMixer()
         check (l == 1.f && r == 1.f, "mixer: stereo centre is unity");
         mixer::pan (1.f, true, l, r);
         check (near (l, 0.f) && r == 1.f, "mixer: stereo hard right turns L down to 0", l);
+        mixer::pan (-1.f, true, l, r);
+        check (l == 1.f && near (r, 0.f), "mixer: stereo hard left turns R down to 0", r);
         mixer::pan (0.5f, true, l, r);
-        check (near (l, 0.70710678) && r == 1.f, "mixer: stereo balance is constant power", l);
+        check (near (l, 0.70710678) && r == 1.f, "mixer: stereo balance follows a cosine law", l);
         mixer::pan (7.f, false, l, r);
         check (near (l, 0.f) && near (r, 1.f), "mixer: pan clamps to -1..1", l);
     }
@@ -1019,20 +1021,22 @@ void testMixer()
         }
         check (ol == 0.f && worst <= step + 1e-6f, "mixer: mute ramps to 0 with no step bigger than the slew", worst);
         check (near (pl, 1.f) && near (pr, 1.f), "mixer: pre-fader tap ignores level, mute and pan", pl);
+        s.process (1.f, 1.f, false, 1.f, 0.f, false, 0.f, 0.f, step, ol, orr, pl, pr);
+        check (near (pl, 1.f) && near (pr, 1.f), "mixer: pre-fader tap ignores a +6 dB level too", pl);
         s.process (2.f, 2.f, false, mixer::unityKnob, 0.f, true, 0.5f, 1.f, step, ol, orr, pl, pr);
         check (near (pl, 1.f), "mixer: DUCK 0.5 at full envelope halves the strip, sends too", pl);
         s.process (2.f, 2.f, false, mixer::unityKnob, 0.f, true, 0.f, 1.f, step, ol, orr, pl, pr);
         check (near (pl, 2.f), "mixer: DUCK 0 is immune to the envelope", pl);
         const float nan = std::numeric_limits<float>::quiet_NaN();
         s.process (nan, nan, true, mixer::unityKnob, 0.f, true, 0.f, 0.f, step, ol, orr, pl, pr);
-        check (ol == 0.f && orr == 0.f && pl == 0.f, "mixer: NaN in reads as 0 V");
+        check (ol == 0.f && orr == 0.f && pl == 0.f && pr == 0.f, "mixer: NaN in reads as 0 V");
     }
     {
         mixer::Sidechain sc;
         const float rel = 0.15f;
         int n = 0;
         while (sc.process (5.f, false, rel, dt) < 0.95f && n < 1000) ++n;
-        check (n < 96, "mixer: follower, a 5 V step reaches 0.95 within 2 ms", n);
+        check (n <= 48, "mixer: follower, a 5 V step reaches 0.95 within 1 ms", n);
         for (int i = 0; i < 480; ++i) sc.process (5.f, false, rel, dt);
         check (near (sc.env, 1.f), "mixer: follower holds 1 at 5 V", sc.env);
         for (int i = 0; i < (int) (rel * 48000); ++i) sc.process (0.f, false, rel, dt);
@@ -1049,6 +1053,37 @@ void testMixer()
         sc.process (0.f, true, rel, dt);
         sc.process (10.f, true, rel, dt);
         check (sc.rising, "mixer: trigger, the next rising edge fires again");
+    }
+    {
+        mixer::Sidechain t;
+        const float rel = 0.15f;
+        t.process (0.99f, true, rel, dt);
+        check (! t.rising, "mixer: trigger, 0.99 V does not fire");
+        t.process (1.f, true, rel, dt);
+        check (t.rising, "mixer: trigger, 1 V fires");
+        for (int i = 0; i < 100; ++i) t.process (10.f, true, rel, dt);
+        t.process (0.5f, true, rel, dt);
+        t.process (10.f, true, rel, dt);
+        check (! t.rising, "mixer: trigger, a dip to 0.5 V is not a new edge (0.1 V hysteresis)");
+    }
+    {
+        mixer::Sidechain m;
+        const float rel = 0.15f;
+        for (int i = 0; i < 10; ++i) m.process (10.f, true, rel, dt);
+        for (int i = 0; i < 48000; ++i) m.process (0.f, false, rel, dt);
+        for (int i = 0; i < 100; ++i) m.process (0.f, true, rel, dt);
+        check (m.env < 0.01f, "mixer: a mode switch mid-ramp does not fire a duck later", m.env);
+    }
+    {
+        mixer::Sidechain f;
+        for (int i = 0; i < 480; ++i) f.process (-5.f, false, 0.15f, dt);
+        check (near (f.env, 1.f), "mixer: follower reads the negative half too", f.env);
+    }
+    {
+        mixer::Sidechain z;
+        for (int i = 0; i < 480; ++i) z.process (5.f, false, 0.02f, dt);
+        for (int i = 0; i < 48000 * 3; ++i) z.process (0.f, false, 0.02f, dt);
+        check (z.env == 0.f, "mixer: the envelope settles to exactly 0", z.env);
     }
     check (near (mixer::releaseOf (0.f), 0.02) && near (mixer::releaseOf (1.f), 1.0, 1e-4) && near (mixer::releaseOf (mixer::knobOfRelease (0.15f)), 0.15, 1e-4),
            "mixer: RELEASE knob is 20 ms .. 1 s, log, and knobOfRelease inverts it");

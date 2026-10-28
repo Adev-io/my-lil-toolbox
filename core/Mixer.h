@@ -18,7 +18,7 @@ inline float levelGain (float k) { return 2.f * k * k; }
 inline float sendGain (float k) { return k * k; }
 
 // Pan p -1..1 into per-side gains. Mono source: constant power, -3 dB each side at the centre. Stereo source:
-// constant-power balance, unity at the centre, the far side turns down to 0 at a hard pan.
+// cosine balance: unity at the centre, the far side turns down to 0 at a hard pan.
 inline void pan (float p, bool stereo, float& gl, float& gr)
 {
     const float halfPi = 1.57079633f;
@@ -49,18 +49,18 @@ inline float slewStep (float dt) { return 2.f * dt / 0.005f; }
 struct Strip
 {
     float gl = 0.f, gr = 0.f;   // slewed gains: level x mute/solo x pan; start silent, so a new strip fades in
+    float panAt = 2.f, panL = 0.f, panR = 0.f; bool panStereo = false;   // pan gains, recomputed only when PAN or the R cable changes
 
     // l, r: input volts (r already normalled to l by the caller). stereo: R was patched. level, panPos: knobs.
-    // duck: DUCK knob 0..1. env: the sidechain envelope 0..1. step: slewStep (dt).
+    // on: audible() for this strip. duck: DUCK knob 0..1. env: the sidechain envelope 0..1. step: slewStep (dt).
     // Writes the post-fader pair (out) and the pre-fader send tap (pre: after the duck, before level/mute/pan).
     void process (float l, float r, bool stereo, float level, float panPos, bool on, float duck, float env, float step,
                   float& outL, float& outR, float& preL, float& preR)
     {
-        float pl, pr;
-        pan (panPos, stereo, pl, pr);
+        if (panPos != panAt || stereo != panStereo) { pan (panPos, stereo, panL, panR); panAt = panPos; panStereo = stereo; }
         const float g = on ? levelGain (level) : 0.f;
-        gl = slew (gl, g * pl, step);
-        gr = slew (gr, g * pr, step);
+        gl = slew (gl, g * panL, step);
+        gr = slew (gr, g * panR, step);
         const float d = 1.f - duck * env;
         preL = scale::clampV (l) * d;
         preR = scale::clampV (r) * d;
@@ -97,10 +97,12 @@ struct Sidechain
         }
         else
         {
+            rising = false;   // a trigger ramp cut short by a mode switch must not fire later
             float target = std::fabs (x) / 5.f;
             target = target > 1.f ? 1.f : target;
             env = target > env ? (target - env > up ? env + up : target) : std::fmax (target, env * fall);
         }
+        if (env < 1e-6f) env = 0.f;
         return env;
     }
 
