@@ -4,7 +4,7 @@ VCV Rack 2 modules by A_Development. MIT.
 
 Jack rings: blue = clock, reset and triggers; lime = pitch; magenta = CV modulation.
 
-## Arpeggio
+## My lil Arpeggio
 
 A dual quantizer / arpeggiator. Sections A and B share one scale.
 
@@ -31,7 +31,7 @@ the time since the last one (10 ms for the first, 1 ms..2 s), for voices that ho
 
 **Lights.** Dim keys are in the scale; lime is A's note, blue is B's (both colors when they share a key), shown before AXIS. The DIR lights show U, D, UD or RND.
 
-## Ripple
+## My lil Ripple
 
 Polyrhythm trigger generator. Four generators tick on a 16th-note grid, each every PERIOD sixteenths, and mix into two
 complementary rhythms, R and R'.
@@ -58,7 +58,7 @@ complementary rhythms, R and R'.
   PLAY is toggled or RESET. Ripple is 16 HP since 2.2.0 (was 12): in an old patch, a module right next to Ripple may now
   overlap it.
 
-## Filter
+## My lil Filter
 
 The acid 24 dB/oct resonant low-pass of My lil Acid Bass, for any audio: two cascaded state-variable stages with the
 same resonance and level behavior as that voice.
@@ -71,7 +71,7 @@ same resonance and level behavior as that voice.
 - **IN** / **OUT**: polyphonic. Each channel has its own filter and OUT has as many channels as IN. Mono CV moves every
   channel; poly CV moves each channel on its own. OUT bends softly above 5 V and never exceeds 10 V.
 
-## Slider
+## My lil Slider
 
 Two 8-step slider sequencers, A and B, on one clock, with a gate button under every slider. 18 HP.
 

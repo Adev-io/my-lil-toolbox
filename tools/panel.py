@@ -60,7 +60,6 @@ TITLE_X, TITLE_Y, TITLE_SIZE = 11.2, 6.3, 4.3
 MASCOT_X = W - 14.46   # 46.5 on 12 HP
 MASCOT_R = BAND * 0.36
 HP = {'Slider': 18, 'Ripple': 16}   # panel width per module, 12 HP unless named here
-NO_CAPTION = {'Slider'}   # modules whose parts sit where the 'my lil toolbox' caption goes
 
 
 def use(name):
@@ -71,26 +70,31 @@ def use(name):
 
 
 def mascot(cx, cy, r):
-    """A little acid face: magenta disc, dot eyes, a wavy mouth. The same face as My lil Acid Bass."""
-    e, m = r * 0.37, r * 0.29
+    """The My lil face: magenta disc, dot eyes, a flat mouth (src/TalkingFace.hpp paints the live mouth over it)."""
+    e = r * 0.37
     return ''.join([
         '<circle cx="%g" cy="%g" r="%g" fill="%s"/>' % (cx, cy, r, MAGENTA),
         '<circle cx="%g" cy="%g" r="%g" fill="%s"/>' % (cx - e, cy - r * 0.32, r * 0.145, INK),
         '<circle cx="%g" cy="%g" r="%g" fill="%s"/>' % (cx + e, cy - r * 0.32, r * 0.145, INK),
-        '<path d="M %g %g q %g %g %g 0 q %g %g %g 0" fill="none" stroke="%s" stroke-width="%g" stroke-linecap="round"/>'
-        % (cx - 2 * m, cy + r * 0.29, m, r * 0.45, 2 * m, m, -r * 0.45, 2 * m, INK, r * 0.16),
+        '<line x1="%g" y1="%g" x2="%g" y2="%g" stroke="%s" stroke-width="%g" stroke-linecap="round"/>'
+        % (cx - r * 0.58, cy + r * 0.45, cx + r * 0.58, cy + r * 0.45, INK, r * 0.16),
     ])
+
+
+def title_size(title):
+    """4.3 mm, or smaller when the title would run into the face (only MY LIL ARPEGGIO on 12 HP)."""
+    return min(TITLE_SIZE, TITLE_SIZE * (MASCOT_X - MASCOT_R - 1.5 - TITLE_X) / width(title, TITLE_SIZE))
 
 
 def band(title):
     """The band's art: lime strip, the title at the left, the face at the right."""
     return ['<rect width="%g" height="%g" fill="%s"/>' % (W, BAND, LIME),
-            text(title, TITLE_X, TITLE_Y, TITLE_SIZE, INK, 'start', 0.39), mascot(MASCOT_X, BAND / 2, MASCOT_R)]
+            text(title, TITLE_X, TITLE_Y, title_size(title), INK, 'start', 0.09 * title_size(title)), mascot(MASCOT_X, BAND / 2, MASCOT_R)]
 
 
 def band_boxes(title):
     """Where the title and the face are, as (x0, y0, x1, y1), for the panel check."""
-    return [('title', (TITLE_X, TITLE_Y - 0.73 * TITLE_SIZE, TITLE_X + width(title, TITLE_SIZE), TITLE_Y)),
+    return [('title', (TITLE_X, TITLE_Y - 0.73 * title_size(title), TITLE_X + width(title, title_size(title)), TITLE_Y)),
             ('mascot', (MASCOT_X - MASCOT_R, BAND / 2 - MASCOT_R, MASCOT_X + MASCOT_R, BAND / 2 + MASCOT_R))]
 
 
@@ -237,8 +241,8 @@ def slider_extras():
     ]
 
 
-MODULES = {'Arpeggio': ('ARPEGGIO', ARPEGGIO, arpeggio_extras, ARPEGGIO_ZONE_Y), 'Ripple': ('RIPPLE', RIPPLE, ripple_extras, RIPPLE_ZONE_Y),
-           'Filter': ('FILTER', FILTER, filter_extras, FILTER_ZONE_Y), 'Slider': ('SLIDER', SLIDER, slider_extras, SLIDER_ZONE_Y)}
+MODULES = {'Arpeggio': ('MY LIL ARPEGGIO', ARPEGGIO, arpeggio_extras, ARPEGGIO_ZONE_Y), 'Ripple': ('MY LIL RIPPLE', RIPPLE, ripple_extras, RIPPLE_ZONE_Y),
+           'Filter': ('MY LIL FILTER', FILTER, filter_extras, FILTER_ZONE_Y), 'Slider': ('MY LIL SLIDER', SLIDER, slider_extras, SLIDER_ZONE_Y)}
 
 
 def reach(kind):
@@ -333,14 +337,12 @@ def problems(layout, title, zone_y):
     return bad
 
 
-def panel(title, layout, extras, caption=True):
+def panel(title, layout, extras):
     out = [
         '<?xml version="1.0" encoding="UTF-8"?>',
         '<svg xmlns="http://www.w3.org/2000/svg" width="%gmm" height="%gmm" viewBox="0 0 %g %g">' % (W, H, W, H),
         '<rect width="%g" height="%g" fill="%s"/>' % (W, H, INK),
-    ] + band(title) + ([
-        text('my lil toolbox', W / 2, 12.6, 2.4, WHITE, stroke=0.12),
-    ] if caption else []) + extras()
+    ] + band(title) + extras()
     rowmax = rowmax_of(layout)
     for _, kind, x, y, label in layout:
         if kind in RING_COLOR:
@@ -375,7 +377,7 @@ if __name__ == '__main__':
         use(name)
         bad = problems(layout, title, zone_y)
         assert not bad, '%s: %s' % (name, '; '.join(bad))
-        files[os.path.join('res', name + '.svg')] = panel(title, layout, extras, name not in NO_CAPTION)
+        files[os.path.join('res', name + '.svg')] = panel(title, layout, extras)
     use('')
     files[os.path.join('src', 'layout.hpp')] = header()
     for rel, body in files.items():
