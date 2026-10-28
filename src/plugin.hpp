@@ -8,9 +8,11 @@ extern Model* modelArpeggio;
 extern Model* modelRipple;
 extern Model* modelFilter;
 extern Model* modelSlider;
+extern Model* modelMixer;
 
 // House light colours, the same as the panels (tools/panel.py) and My lil Acid Bass.
 struct LimeLight : GrayModuleLightWidget { LimeLight() { addBaseColor (nvgRGB (0xc8, 0xff, 0x3a)); } };
+struct MagentaLight : GrayModuleLightWidget { MagentaLight() { addBaseColor (nvgRGB (0xff, 0x3d, 0x9a)); } };
 // Two-state lights: channel 0 lime, channel 1 magenta.
 struct LimeMagentaLight : GrayModuleLightWidget
 {

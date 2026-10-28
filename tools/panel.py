@@ -59,8 +59,7 @@ def text(s, x, y, size, fill, anchor='middle', stroke=0.0):
 TITLE_X, TITLE_Y, TITLE_SIZE = 11.2, 6.3, 4.3
 MASCOT_X = W - 14.46   # 46.5 on 12 HP
 MASCOT_R = BAND * 0.36
-HP = {'Slider': 18, 'Ripple': 16}   # panel width per module, 12 HP unless named here
-NO_CAPTION = {'Slider'}   # modules whose parts sit where the 'my lil toolbox' caption goes
+HP = {'Slider': 18, 'Ripple': 16, 'Mixer': 26}   # panel width per module, 12 HP unless named here
 
 
 def use(name):
@@ -71,26 +70,31 @@ def use(name):
 
 
 def mascot(cx, cy, r):
-    """A little acid face: magenta disc, dot eyes, a wavy mouth. The same face as My lil Acid Bass."""
-    e, m = r * 0.37, r * 0.29
+    """The My lil face: magenta disc, dot eyes, a flat mouth (src/TalkingFace.hpp paints the live mouth over it)."""
+    e = r * 0.37
     return ''.join([
         '<circle cx="%g" cy="%g" r="%g" fill="%s"/>' % (cx, cy, r, MAGENTA),
         '<circle cx="%g" cy="%g" r="%g" fill="%s"/>' % (cx - e, cy - r * 0.32, r * 0.145, INK),
         '<circle cx="%g" cy="%g" r="%g" fill="%s"/>' % (cx + e, cy - r * 0.32, r * 0.145, INK),
-        '<path d="M %g %g q %g %g %g 0 q %g %g %g 0" fill="none" stroke="%s" stroke-width="%g" stroke-linecap="round"/>'
-        % (cx - 2 * m, cy + r * 0.29, m, r * 0.45, 2 * m, m, -r * 0.45, 2 * m, INK, r * 0.16),
+        '<line x1="%g" y1="%g" x2="%g" y2="%g" stroke="%s" stroke-width="%g" stroke-linecap="round"/>'
+        % (cx - r * 0.58, cy + r * 0.45, cx + r * 0.58, cy + r * 0.45, INK, r * 0.16),
     ])
+
+
+def title_size(title):
+    """4.3 mm, or smaller when the title would run into the face (only MY LIL ARPEGGIO on 12 HP)."""
+    return min(TITLE_SIZE, TITLE_SIZE * (MASCOT_X - MASCOT_R - 1.5 - TITLE_X) / width(title, TITLE_SIZE))
 
 
 def band(title):
     """The band's art: lime strip, the title at the left, the face at the right."""
     return ['<rect width="%g" height="%g" fill="%s"/>' % (W, BAND, LIME),
-            text(title, TITLE_X, TITLE_Y, TITLE_SIZE, INK, 'start', 0.39), mascot(MASCOT_X, BAND / 2, MASCOT_R)]
+            text(title, TITLE_X, TITLE_Y, title_size(title), INK, 'start', 0.09 * title_size(title)), mascot(MASCOT_X, BAND / 2, MASCOT_R)]
 
 
 def band_boxes(title):
     """Where the title and the face are, as (x0, y0, x1, y1), for the panel check."""
-    return [('title', (TITLE_X, TITLE_Y - 0.73 * TITLE_SIZE, TITLE_X + width(title, TITLE_SIZE), TITLE_Y)),
+    return [('title', (TITLE_X, TITLE_Y - 0.73 * title_size(title), TITLE_X + width(title, title_size(title)), TITLE_Y)),
             ('mascot', (MASCOT_X - MASCOT_R, BAND / 2 - MASCOT_R, MASCOT_X + MASCOT_R, BAND / 2 + MASCOT_R))]
 
 
@@ -237,8 +241,48 @@ def slider_extras():
     ]
 
 
-MODULES = {'Arpeggio': ('ARPEGGIO', ARPEGGIO, arpeggio_extras, ARPEGGIO_ZONE_Y), 'Ripple': ('RIPPLE', RIPPLE, ripple_extras, RIPPLE_ZONE_Y),
-           'Filter': ('FILTER', FILTER, filter_extras, FILTER_ZONE_Y), 'Slider': ('SLIDER', SLIDER, slider_extras, SLIDER_ZONE_Y)}
+# ---- Mixer (26 HP): eight strip columns (SEND 1, SEND 2, DUCK, PAN, LEVEL fader, signal light, MUTE, SOLO, IN L, IN R),
+# rows captioned in the left margin, strip numbers on top; the master section right of a divider. Built on its own
+# width MW, never the global W. Strip parts carry no labels: the captions and numbers name them.
+MW = 5.08 * HP['Mixer']
+STRIP_DX = 11.0
+MIX_X = [10.5 + STRIP_DX * i for i in range(8)]   # strip columns, 11 mm apart (the widget steps by STRIP_DX from strip 0)
+ROW_S1, ROW_S2, ROW_DUCK, ROW_PAN, ROW_LEVEL = 19.0, 28.8, 38.6, 48.4, 67.5
+ROW_SIG, ROW_MUTE, ROW_SOLO, ROW_INL, ROW_INR = 83.0, 87.8, 95.0, 106.0, 117.6
+MC = (101.0, 112.0, 123.0)   # master columns
+MIXER_ZONE_Y = 100.0
+MIXER = [part for i, x in enumerate(MIX_X) for part in (
+    ('SEND1_%d_PARAM' % i, 'tiny', x, ROW_S1, ''), ('SEND2_%d_PARAM' % i, 'tiny', x, ROW_S2, ''),
+    ('DUCK%d_PARAM' % i, 'tiny', x, ROW_DUCK, ''), ('PAN%d_PARAM' % i, 'tiny', x, ROW_PAN, ''),
+    ('LEVEL%d_PARAM' % i, 'slider', x, ROW_LEVEL, ''), ('SIGNAL%d_LIGHT' % i, 'light', x, ROW_SIG, ''),
+    ('MUTE%d_PARAM' % i, 'button', x, ROW_MUTE, ''), ('SOLO%d_PARAM' % i, 'button', x, ROW_SOLO, ''),
+    ('L%d_INPUT' % i, 'play', x, ROW_INL, ''), ('R%d_INPUT' % i, 'play', x, ROW_INR, ''))] + [
+    ('MASTER_PARAM', 'hero', (MC[0] + MC[1]) / 2, 22.0, 'MASTER'), ('RELEASE_PARAM', 'tiny', MC[2], 22.0, 'REL'),
+    ('SC_INPUT', 'seq', MC[0], 44.0, 'SC'),
+    ('RETURN1_L_INPUT', 'play', MC[1], 44.0, 'RTN1 L'), ('RETURN1_R_INPUT', 'play', MC[2], 44.0, 'RTN1 R'),
+    ('RETURN2_L_INPUT', 'play', MC[1], 59.5, 'RTN2 L'), ('RETURN2_R_INPUT', 'play', MC[2], 59.5, 'RTN2 R'),
+    ('SEND1_L_OUTPUT', 'out', MC[1], 75.0, 'SND1 L'), ('SEND1_R_OUTPUT', 'out', MC[2], 75.0, 'SND1 R'),
+    ('SEND2_L_OUTPUT', 'out', MC[1], 90.5, 'SND2 L'), ('SEND2_R_OUTPUT', 'out', MC[2], 90.5, 'SND2 R'),
+    ('OUT_L_OUTPUT', 'out', MC[1], 110.0, 'OUT L'), ('OUT_R_OUTPUT', 'out', MC[2], 110.0, 'OUT R'),
+]
+
+
+def mixer_extras():
+    return [
+        '<rect x="%g" y="%g" width="%g" height="23.7" rx="2" fill="%s"/>' % (ZONE_X, MIXER_ZONE_Y, MW - 2 * ZONE_X, INK2),   # jack zone, bottom at 123.7
+        '<rect x="%g" y="14.6" width="0.4" height="83" fill="%s"/>' % ((MIX_X[-1] + MC[0]) / 2 - 0.2, DIM),   # divider: the master section, centred between strip 8 and the master columns
+    ] + ['<rect x="%g" y="%g" width="4.2" height="%g" rx="1" fill="%s"/>' % (x - 2.1, ROW_LEVEL - SLIDER_BOX[1] / 2, SLIDER_BOX[1], INK2)
+         for x in MIX_X] + [text(str(i + 1), x, 13.6, 2.8, LIME, stroke=0.2) for i, x in enumerate(MIX_X)] + [
+        (text(s, 3.4, y + 0.8, 2.2, DIM) if len(s) == 1 else caption(s, y))   # one letter reads upright, longer words upwards
+        for s, y in (('SEND 1', ROW_S1), ('SEND 2', ROW_S2), ('DUCK', ROW_DUCK), ('PAN', ROW_PAN), ('LEVEL', ROW_LEVEL),
+                                   ('M', ROW_MUTE), ('S', ROW_SOLO), ('L', ROW_INL), ('R', ROW_INR))]
+
+
+MODULES = {'Arpeggio': ('MY LIL ARPEGGIO', ARPEGGIO, arpeggio_extras, ARPEGGIO_ZONE_Y), 'Ripple': ('MY LIL RIPPLE', RIPPLE, ripple_extras, RIPPLE_ZONE_Y),
+           'Filter': ('MY LIL FILTER', FILTER, filter_extras, FILTER_ZONE_Y), 'Slider': ('MY LIL SLIDER', SLIDER, slider_extras, SLIDER_ZONE_Y),
+           'Mixer': ('MY LIL MIXER', MIXER, mixer_extras, MIXER_ZONE_Y)}
+EXTRA_CONSTS = {'Mixer': ['constexpr float STRIP_DX = %.2ff;   // strip column pitch: strip i sits at strip 0 + i * STRIP_DX' % STRIP_DX,
+                          'constexpr int STRIPS = %d;   // strip count; Mixer.cpp static_asserts it equals mixer::numStrips' % len(MIX_X)]}
 
 
 def reach(kind):
@@ -333,14 +377,12 @@ def problems(layout, title, zone_y):
     return bad
 
 
-def panel(title, layout, extras, caption=True):
+def panel(title, layout, extras):
     out = [
         '<?xml version="1.0" encoding="UTF-8"?>',
         '<svg xmlns="http://www.w3.org/2000/svg" width="%gmm" height="%gmm" viewBox="0 0 %g %g">' % (W, H, W, H),
         '<rect width="%g" height="%g" fill="%s"/>' % (W, H, INK),
-    ] + band(title) + ([
-        text('my lil toolbox', W / 2, 12.6, 2.4, WHITE, stroke=0.12),
-    ] if caption else []) + extras()
+    ] + band(title) + extras()
     rowmax = rowmax_of(layout)
     for _, kind, x, y, label in layout:
         if kind in RING_COLOR:
@@ -363,6 +405,7 @@ def header():
         lines += ['namespace %s {' % name.lower()]
         lines += ['constexpr float %s[2] = {%.2ff, %.2ff};' % (i, x, y) for i, _, x, y, _ in layout]
         lines += ['constexpr float FACE[3] = {%.2ff, %.2ff, %.3ff};   // mascot centre x, y, radius (TalkingFace)' % (MASCOT_X, BAND / 2, MASCOT_R)]
+        lines += EXTRA_CONSTS.get(name, [])
         lines += ['}']
     use('')
     lines += ['}', '']
@@ -375,7 +418,7 @@ if __name__ == '__main__':
         use(name)
         bad = problems(layout, title, zone_y)
         assert not bad, '%s: %s' % (name, '; '.join(bad))
-        files[os.path.join('res', name + '.svg')] = panel(title, layout, extras, name not in NO_CAPTION)
+        files[os.path.join('res', name + '.svg')] = panel(title, layout, extras)
     use('')
     files[os.path.join('src', 'layout.hpp')] = header()
     for rel, body in files.items():

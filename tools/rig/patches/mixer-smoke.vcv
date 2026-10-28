@@ -1,0 +1,9 @@
+{"version":"2.6.6","modules":[
+{"id":1,"plugin":"Fundamental","model":"LFO","version":"2.6.4","params":[],"pos":[0,0]},
+{"id":2,"plugin":"MyLilToolbox","model":"Mixer","version":"2.2.0","params":[{"id":32,"value":0.8},{"id":8,"value":-0.5}],"pos":[10,0]},
+{"id":3,"plugin":"Fundamental","model":"Scope","version":"2.6.4","params":[],"pos":[37,0]}],
+"cables":[
+{"id":1,"outputModuleId":1,"outputId":0,"inputModuleId":2,"inputId":0,"color":"#c8ff3a"},
+{"id":2,"outputModuleId":1,"outputId":3,"inputModuleId":2,"inputId":16,"color":"#5ac8e6"},
+{"id":3,"outputModuleId":2,"outputId":0,"inputModuleId":3,"inputId":0,"color":"#ff3d9a"},
+{"id":4,"outputModuleId":2,"outputId":1,"inputModuleId":3,"inputId":1,"color":"#f2f2f4"}]}

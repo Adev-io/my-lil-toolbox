@@ -9,11 +9,13 @@
 #include "Ladder.h"
 #include "Env.h"
 #include "Slider.h"
+#include "Mixer.h"
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
 #include <initializer_list>
+#include <limits>
 #include <string>
 #include <utility>
 #include <vector>
@@ -971,6 +973,151 @@ void testEnv()
     }
 }
 
+double dB (double g) { return 20.0 * std::log10 (g); }
+
+void testMixer()
+{
+    const float dt = 1.f / 48000.f, step = mixer::slewStep (dt);
+    check (near (dB (mixer::levelGain (mixer::unityKnob)), 0.0, 0.05), "mixer: LEVEL at 0.707 is unity", dB (mixer::levelGain (mixer::unityKnob)));
+    check (mixer::levelGain (0.f) == 0.f && near (dB (mixer::levelGain (1.f)), 6.02, 0.01), "mixer: LEVEL 0 is silence, 1 is +6 dB", dB (mixer::levelGain (1.f)));
+    check (mixer::sendGain (0.f) == 0.f && mixer::sendGain (1.f) == 1.f, "mixer: SEND 0..1 is silence..unity");
+    {
+        float l, r;
+        mixer::pan (0.f, false, l, r);
+        check (near (dB (l), -3.01, 0.01) && near (l, r), "mixer: mono centre is -3 dB each side", dB (l));
+        mixer::pan (-1.f, false, l, r);
+        check (near (l, 1.f) && near (r, 0.f), "mixer: mono hard left", r);
+        mixer::pan (0.f, true, l, r);
+        check (l == 1.f && r == 1.f, "mixer: stereo centre is unity");
+        mixer::pan (1.f, true, l, r);
+        check (near (l, 0.f) && r == 1.f, "mixer: stereo hard right turns L down to 0", l);
+        mixer::pan (-1.f, true, l, r);
+        check (l == 1.f && near (r, 0.f), "mixer: stereo hard left turns R down to 0", r);
+        mixer::pan (0.5f, true, l, r);
+        check (near (l, 0.70710678) && r == 1.f, "mixer: stereo balance follows a cosine law", l);
+        mixer::pan (7.f, false, l, r);
+        check (near (l, 0.f) && near (r, 1.f), "mixer: pan clamps to -1..1", l);
+    }
+    check (mixer::audible (false, false, false) && ! mixer::audible (true, false, false), "mixer: mute silences");
+    check (! mixer::audible (false, false, true) && mixer::audible (false, true, true), "mixer: solo isolates");
+    check (! mixer::audible (true, true, true), "mixer: mute beats solo");
+    {
+        mixer::Strip s;
+        float ol = 0, orr = 0, pl = 0, pr = 0;
+        int n = 0;
+        while (s.gl < mixer::levelGain (mixer::unityKnob) * 0.7071f - 1e-6f && n < 10000)
+        {
+            s.process (1.f, 1.f, false, mixer::unityKnob, 0.f, true, 0.f, 0.f, step, ol, orr, pl, pr);
+            ++n;
+        }
+        check (n <= 240, "mixer: a new strip fades in within 5 ms", n);
+        check (near (ol, 0.7071, 1e-3) && near (orr, 0.7071, 1e-3), "mixer: unity strip, mono centre, 1 V in -> 0.707 V each side", ol);
+        float worst = 0.f, prev = ol;
+        for (int i = 0; i < 480; ++i)
+        {
+            s.process (1.f, 1.f, false, mixer::unityKnob, 0.f, false, 0.f, 0.f, step, ol, orr, pl, pr);
+            worst = std::max (worst, std::fabs (ol - prev));
+            prev = ol;
+        }
+        check (ol == 0.f && worst <= step + 1e-6f, "mixer: mute ramps to 0 with no step bigger than the slew", worst);
+        check (near (pl, 1.f) && near (pr, 1.f), "mixer: pre-fader tap ignores level, mute and pan", pl);
+        s.process (1.f, 1.f, false, 1.f, 0.f, false, 0.f, 0.f, step, ol, orr, pl, pr);
+        check (near (pl, 1.f) && near (pr, 1.f), "mixer: pre-fader tap ignores a +6 dB level too", pl);
+        s.process (2.f, 2.f, false, mixer::unityKnob, 0.f, true, 0.5f, 1.f, step, ol, orr, pl, pr);
+        check (near (pl, 1.f), "mixer: DUCK 0.5 at full envelope halves the strip, sends too", pl);
+        s.process (2.f, 2.f, false, mixer::unityKnob, 0.f, true, 0.f, 1.f, step, ol, orr, pl, pr);
+        check (near (pl, 2.f), "mixer: DUCK 0 is immune to the envelope", pl);
+        const float nan = std::numeric_limits<float>::quiet_NaN();
+        s.process (nan, nan, true, mixer::unityKnob, 0.f, true, 0.f, 0.f, step, ol, orr, pl, pr);
+        check (ol == 0.f && orr == 0.f && pl == 0.f && pr == 0.f, "mixer: NaN in reads as 0 V");
+        {
+            mixer::Strip h;
+            for (int i = 0; i < 480; ++i) h.process (15.f, 15.f, true, mixer::unityKnob, 0.f, true, 0.f, 0.f, step, ol, orr, pl, pr);
+            check (near (pl, 15.f) && near (ol, 15.f, 1e-3), "mixer: a hot input (15 V, e.g. a summed poly cable) is not clipped before LEVEL", pl);
+            const float inf = std::numeric_limits<float>::infinity();
+            h.process (inf, inf, true, mixer::unityKnob, 0.f, true, 0.f, 0.f, step, ol, orr, pl, pr);
+            check (pl == 0.f && pr == 0.f, "mixer: an infinite input reads as 0 V");
+        }
+        for (int i = 0; i < 480; ++i) s.process (1.f, 1.f, false, mixer::unityKnob, 1.f, true, 0.f, 0.f, step, ol, orr, pl, pr);
+        check (near (ol, 0.f) && near (orr, 1.f, 1e-3), "mixer: strip follows a PAN move (cached gains refresh)", ol);
+        for (int i = 0; i < 480; ++i) s.process (1.f, 1.f, false, mixer::unityKnob, 0.f, true, 0.f, 0.f, step, ol, orr, pl, pr);
+        for (int i = 0; i < 480; ++i) s.process (1.f, 1.f, true, mixer::unityKnob, 0.f, true, 0.f, 0.f, step, ol, orr, pl, pr);
+        check (near (ol, 1.f, 1e-3) && near (orr, 1.f, 1e-3), "mixer: strip follows a mono/stereo change (cached gains refresh)", ol);
+    }
+    {
+        mixer::Sidechain sc;
+        const float rel = 0.15f;
+        int n = 0;
+        while (sc.process (5.f, false, rel, dt) < 0.95f && n < 1000) ++n;
+        check (n <= 48, "mixer: follower, a 5 V step reaches 0.95 within 1 ms", n);
+        for (int i = 0; i < 480; ++i) sc.process (5.f, false, rel, dt);
+        check (near (sc.env, 1.f), "mixer: follower holds 1 at 5 V", sc.env);
+        for (int i = 0; i < (int) (rel * 48000); ++i) sc.process (0.f, false, rel, dt);
+        check (near (sc.env, std::exp (-1.0), 2e-3), "mixer: follower falls to 1/e in RELEASE", sc.env);
+        sc.reset();
+        check (sc.process (0.f, false, rel, dt) == 0.f, "mixer: unpatched (0 V) sidechain is no envelope");
+        for (int i = 0; i < 480; ++i) sc.process (0.5f, true, rel, dt);
+        check (sc.env == 0.f, "mixer: trigger, 0.5 V does not fire", sc.env);
+        n = 0;
+        while (sc.process (10.f, true, rel, dt) < 1.f && n < 1000) ++n;
+        check (n <= 49, "mixer: trigger, a rising edge ramps to 1 within 1 ms", n);
+        for (int i = 0; i < (int) (rel * 48000); ++i) sc.process (10.f, true, rel, dt);
+        check (near (sc.env, std::exp (-1.0), 2e-3), "mixer: trigger, a held gate does not refire, falls to 1/e in RELEASE", sc.env);
+        sc.process (0.f, true, rel, dt);
+        sc.process (10.f, true, rel, dt);
+        check (sc.rising, "mixer: trigger, the next rising edge fires again");
+    }
+    {
+        mixer::Sidechain t;
+        const float rel = 0.15f;
+        t.process (0.99f, true, rel, dt);
+        check (! t.rising, "mixer: trigger, 0.99 V does not fire");
+        t.process (1.f, true, rel, dt);
+        check (t.rising, "mixer: trigger, 1 V fires");
+        for (int i = 0; i < 4800; ++i) t.process (10.f, true, rel, dt);
+        t.process (0.5f, true, rel, dt);
+        t.process (10.f, true, rel, dt);
+        check (! t.rising, "mixer: trigger, a dip to 0.5 V is not a new edge (0.1 V hysteresis)");
+        mixer::Sidechain u;
+        for (int i = 0; i < 4800; ++i) u.process (10.f, true, rel, dt);
+        u.process (0.05f, true, rel, dt);
+        u.process (10.f, true, rel, dt);
+        check (u.rising, "mixer: trigger, a dip below 0.1 V re-arms");
+    }
+    {
+        mixer::Sidechain m;
+        const float rel = 0.15f;
+        for (int i = 0; i < 10; ++i) m.process (10.f, true, rel, dt);
+        for (int i = 0; i < 48000; ++i) m.process (0.f, false, rel, dt);
+        for (int i = 0; i < 100; ++i) m.process (0.f, true, rel, dt);
+        check (m.env < 0.01f, "mixer: a mode switch mid-ramp does not fire a duck later", m.env);
+    }
+    {
+        mixer::Sidechain f;
+        for (int i = 0; i < 480; ++i) f.process (-5.f, false, 0.15f, dt);
+        check (near (f.env, 1.f), "mixer: follower reads the negative half too", f.env);
+    }
+    {
+        mixer::Sidechain z;
+        for (int i = 0; i < 480; ++i) z.process (5.f, false, 0.02f, dt);
+        for (int i = 0; i < 48000 / 2; ++i) z.process (0.f, false, 0.02f, dt);
+        check (z.env == 0.f, "mixer: the envelope settles to exactly 0", z.env);
+    }
+    check (near (mixer::releaseOf (0.f), 0.02) && near (mixer::releaseOf (1.f), 1.0, 1e-4) && near (mixer::releaseOf (mixer::knobOfRelease (0.15f)), 0.15, 1e-4),
+           "mixer: RELEASE knob is 20 ms .. 1 s, log, and knobOfRelease inverts it");
+    {
+        const float c = mixer::peakCoef (dt);
+        float p = mixer::peak (0.f, -6.f, c);
+        check (p == 6.f, "mixer: peak catches the magnitude", p);
+        for (int i = 0; i < 4800; ++i) p = mixer::peak (p, 0.f, c);
+        check (near (p, 6.0 * std::exp (-1.0), 1e-3), "mixer: peak falls to 1/e in 100 ms", p);
+    }
+    check (mixer::softClip (4.9f) == 4.9f && mixer::softClip (-5.f) == -5.f, "mixer: soft clip is the identity up to 5 V");
+    check (near ((mixer::softClip (5.001f) - 5.f) / 0.001f, 1.0, 1e-2), "mixer: soft clip has slope 1 at the knee", mixer::softClip (5.001f));
+    check (mixer::softClip (100.f) <= 8.f && mixer::softClip (-100.f) >= -8.f && mixer::softClip (100.f) > 7.9f && mixer::softClip (6.f) < 6.f, "mixer: soft clip bends above 5 V and never passes 8 V", mixer::softClip (100.f));
+    check (mixer::softClip (std::numeric_limits<float>::quiet_NaN()) == 0.f, "mixer: soft clip NaN reads as 0 V");
+}
+
 int main()
 {
     sliderChecks();
@@ -997,6 +1144,7 @@ int main()
     testLadderResponse();
     testLadderSafety();
     testEnv();
+    testMixer();
     // ---- calls (each task adds its calls above this line)
     std::printf ("\n%s: %d failure(s)\n", failures ? "FAILED" : "PASSED", failures);
     return failures ? 1 : 0;

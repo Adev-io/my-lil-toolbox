@@ -4,7 +4,7 @@ VCV Rack 2 modules by A_Development. MIT.
 
 Jack rings: blue = clock, reset and triggers; lime = pitch; magenta = CV modulation.
 
-## Arpeggio
+## My lil Arpeggio
 
 A dual quantizer / arpeggiator. Sections A and B share one scale.
 
@@ -31,7 +31,7 @@ the time since the last one (10 ms for the first, 1 ms..2 s), for voices that ho
 
 **Lights.** Dim keys are in the scale; lime is A's note, blue is B's (both colors when they share a key), shown before AXIS. The DIR lights show U, D, UD or RND.
 
-## Ripple
+## My lil Ripple
 
 Polyrhythm trigger generator. Four generators tick on a 16th-note grid, each every PERIOD sixteenths, and mix into two
 complementary rhythms, R and R'.
@@ -58,7 +58,7 @@ complementary rhythms, R and R'.
   PLAY is toggled or RESET. Ripple is 16 HP since 2.2.0 (was 12): in an old patch, a module right next to Ripple may now
   overlap it.
 
-## Filter
+## My lil Filter
 
 The acid 24 dB/oct resonant low-pass of My lil Acid Bass, for any audio: two cascaded state-variable stages with the
 same resonance and level behavior as that voice.
@@ -71,7 +71,7 @@ same resonance and level behavior as that voice.
 - **IN** / **OUT**: polyphonic. Each channel has its own filter and OUT has as many channels as IN. Mono CV moves every
   channel; poly CV moves each channel on its own. OUT bends softly above 5 V and never exceeds 10 V.
 
-## Slider
+## My lil Slider
 
 Two 8-step slider sequencers, A and B, on one clock, with a gate button under every slider. 18 HP.
 
@@ -92,6 +92,26 @@ Two 8-step slider sequencers, A and B, on one clock, with a gate button under ev
 
 Patch idea: Slider A CV into a voice's V/OCT and A GATE into its GATE; set a few sliders and gate buttons, or arm REC
 and play a pitch CV into A CV for one pass to capture a line.
+
+## My lil Mixer
+
+Eight stereo strips into a master bus, with two sends and returns and one sidechain that ducks every strip. 26 HP.
+
+- Per strip: inputs **L** and **R** (unpatched R copies L; poly cables are summed, with no clipping before LEVEL), **LEVEL** fader (0 dB at the default,
+  +6 dB at the top), **PAN** (a mono source pans at constant power, a stereo source balances), **SEND 1** and **SEND 2**,
+  **DUCK**, **M** (mute) and **S** (solo). Any solo plays only the soloed strips; mute always wins. The light over M
+  shows the strip's level, magenta when it runs above 5 V.
+- **SC** feeds the sidechain: each strip's **DUCK** sets how far it is pulled down when the sidechain hits, **REL** how
+  fast it comes back (20 ms to 1 s). Patch the kick into SC and turn up DUCK on the bass and pads for the house pump;
+  leave the kick's own strip at 0.
+- **SND1** and **SND2** are stereo sends, **RTN1** and **RTN2** stereo returns summed into the master at unity
+  (unpatched R copies L). **MASTER** sets the output level; **OUT L** and **OUT R** are the mix. Sends are not clipped.
+- Context menu: **SC IN reads** Audio (an envelope follower, the default) or Triggers (each rising edge fires one
+  duck, so the pump stays even whatever the kick's level); **Sends pre-fader** (off: post-fader; pre-fader sends ignore LEVEL, PAN and mute); **Master soft clip**
+  (on by default: untouched up to 5 V, then a smooth bend that never passes 8 V).
+
+Patch idea: Drums kick into strip 1 and into SC, an acid line into strip 2 with DUCK at 70 %, a pad into strip 3 with
+SEND 1 into a reverb, the reverb back into RTN1, OUT L/R to the audio interface.
 
 ## Build
 
