@@ -41,7 +41,7 @@ struct Mixer : Module
     float sampleRate = 0.f, step = 0.f;
     FaceTap face;            // the band mascot's mouth: the master out
     FaceTap stripFace[N];    // each strip's mouth: its post-fader out
-    MeterState meters;       // what the meters show, refreshed every light block
+    mixerui::MeterState meters;   // what the meters show, refreshed every light block
     meter::Ballistics inBal[N], outBal[2];
     meter::ClipLatch inClip[N], outClip;
     meter::Loudness loudness;
@@ -185,7 +185,7 @@ struct Mixer : Module
         const uint32_t clear = meters.clearReq.exchange (0);
         for (int i = 0; i < N; ++i)
         {
-            if (clear & (MeterState::clearAll | 1u << i)) inClip[i].clear();
+            if (clear & (mixerui::MeterState::clearAll | 1u << i)) inClip[i].clear();
             inBal[i].process (meter::dbfs (inPeak[i]), dt);
             inClip[i].process (inPeak[i]);
             meters.stripDb[i] = inBal[i].level;
@@ -194,7 +194,7 @@ struct Mixer : Module
             meters.duckDb[i] = meter::duckDb (params[DUCK_PARAM + i].getValue(), envPeak);
             inPeak[i] = 0.f;
         }
-        if (clear & MeterState::clearAll) outClip.clear();
+        if (clear & mixerui::MeterState::clearAll) outClip.clear();
         for (int c = 0; c < 2; ++c)
         {
             outBal[c].process (meter::dbfs (outPeak[c]), dt);
@@ -216,11 +216,14 @@ struct Mixer : Module
         // slewed gains are left alone: they glide to the reset params, so Initialize does not click
         sc.reset();
         // Initialize clears the clip latches, bars, peak ticks, LUFS and history (the engine holds its lock, so the audio thread is not mid-block)
-        meters.clearReq.fetch_or (MeterState::clearAll);
+        meters.clearReq.fetch_or (mixerui::MeterState::clearAll);
         for (meter::Ballistics& b : inBal) b.reset();
         for (meter::Ballistics& b : outBal) b.reset();
         loudness.reset();
         meters.history.reset();
+        // and the peaks still pending from before it, so a cleared latch cannot re-latch from samples that arrived just ahead of Initialize
+        std::fill (inPeak, inPeak + N, 0.f);
+        outPeak[0] = outPeak[1] = envPeak = 0.f;
     }
 
     json_t* dataToJson() override
@@ -269,7 +272,7 @@ struct MixerWidget : ModuleWidget
             if (module) f->tap = &module->stripFace[i];
             addChild (f);
             const Rect lad = boxAt (L::METER0, L::METER_SIZE, i * L::STRIP_DX), duck = boxAt (L::DUCKBAR0, L::DUCKBAR_SIZE, i * L::STRIP_DX);
-            StripMeter* m = new StripMeter;
+            mixerui::StripMeter* m = new mixerui::StripMeter;
             m->box = lad.expand (duck);
             m->ladderBox = Rect (lad.pos.minus (m->box.pos), lad.size);
             m->duckBox = Rect (duck.pos.minus (m->box.pos), duck.size);
@@ -288,7 +291,7 @@ struct MixerWidget : ModuleWidget
             addInput (createInputCentered<PJ301MPort> (strip (L::R0_INPUT, i), module, Mixer::R_INPUT + i));
         }
 
-        MasterDisplay* d = new MasterDisplay;
+        mixerui::MasterDisplay* d = new mixerui::MasterDisplay;
         d->box = boxAt (L::DISPLAY, L::DISPLAY_SIZE, 0.f);
         if (module) d->st = &module->meters;
         addChild (d);

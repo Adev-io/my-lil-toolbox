@@ -10,6 +10,8 @@
 #include "Meter.h"
 #include "Mixer.h"
 
+namespace mixerui
+{
 // Filled by the audio thread once per meter block, read by the UI thread: a torn float only blurs one frame (as FaceTap).
 // The UI writes nothing here but clearReq: a click sets a bit, the audio thread takes the bits and clears those latches.
 struct MeterState
@@ -37,8 +39,6 @@ struct MeterState
     }
 };
 
-namespace mixerui
-{
 const NVGcolor INK = nvgRGB (0x16, 0x16, 0x1a), LIME = nvgRGB (0xc8, 0xff, 0x3a), MAGENTA = nvgRGB (0xff, 0x3d, 0x9a),
                BLUE = nvgRGB (0x5a, 0xc8, 0xe6), WHITE = nvgRGB (0xf2, 0xf2, 0xf4), DIM = nvgRGB (0x8d, 0x8d, 0x96);
 
@@ -81,7 +81,6 @@ inline void ladder (NVGcontext* vg, float x, float y, float w, float h, float db
     }
     if (litPass && holdDb > meter::floorDb)
         fillRect (vg, x, y + h - meter::ladderPos (holdDb) / meter::segments * h, w, std::max (1.f, mm2px (0.3f)), WHITE);
-}
 }
 
 // A strip's meter, right of its fader: the ladder (input level, clip dot on top) and the blue duck bar beside it.
@@ -210,3 +209,4 @@ struct MasterDisplay : Widget
         }
     }
 };
+}

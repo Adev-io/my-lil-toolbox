@@ -107,7 +107,8 @@ that show what reaches the audio interface. 34 HP.
   the dot on top latches magenta when the input reaches 10 V (click the meter to clear it); and a blue bar showing how
   far the sidechain pulls the strip down right now (0 to -24 dB). The face over each strip talks with what the strip
   sends on (after LEVEL, mute and the duck: a muted strip keeps a straight face).
-- The display over the master: OUT L and R after the soft clip on the same ladders, with the master clip dot; their
+- The display over the master: OUT L and R after the soft clip on the same ladders, with the master clip dot (it
+  latches only with **Master soft clip** off: the soft clip tops out at 8 V, about -1.9 dBFS); their
   peak-hold readouts in dBFS; the short-term loudness (LUFS over 3 s, K-weighted as in BS.1770); and the master's last
   6 s of peaks, kicks standing tall and ducks showing as notches. Click the display to clear the master's and every
   strip's clip latch; Initialize clears them too, and drops the meter bars, peak ticks, loudness and history.
