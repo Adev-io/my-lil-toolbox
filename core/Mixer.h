@@ -10,7 +10,7 @@ namespace mixer
 {
 constexpr int numStrips = 8;
 constexpr float unityKnob = 0.70710678f;   // the LEVEL / MASTER knob position for 0 dB
-constexpr float hotV = 5.f;                // signal light turns magenta above this; soft clip starts here
+constexpr float hotV = 5.f;                // soft clip starts here
 
 inline float finite (float v) { return std::isfinite (v) ? v : 0.f; }   // NaN / inf read as 0 V; no ±10 V clamp, so a hot or summed input keeps its shape
 

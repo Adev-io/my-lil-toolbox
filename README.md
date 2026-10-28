@@ -110,7 +110,7 @@ that show what reaches the audio interface. 34 HP.
 - The display over the master: OUT L and R after the soft clip on the same ladders, with the master clip dot; their
   peak-hold readouts in dBFS; the short-term loudness (LUFS over 3 s, K-weighted as in BS.1770); and the master's last
   6 s of peaks, kicks standing tall and ducks showing as notches. Click the display to clear the master's and every
-  strip's clip latch; Initialize clears them too, and drops the meter bars and peak ticks.
+  strip's clip latch; Initialize clears them too, and drops the meter bars, peak ticks, loudness and history.
 - **SC** feeds the sidechain: each strip's **DUCK** sets how far it is pulled down when the sidechain hits, **REL** how
   fast it comes back (20 ms to 1 s). Patch the kick into SC and turn up DUCK on the bass and pads for the house pump;
   leave the kick's own strip at 0.

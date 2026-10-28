@@ -59,13 +59,26 @@ inline void fillDot (NVGcontext* vg, float cx, float cy, float r, NVGcolor c)
 }
 
 // One LED ladder in (x, y, w, h), px, bottom up. Dark pass: every segment unlit (ink). Lit pass: the segments under db,
-// lime below -6 dBFS and magenta above, and the white peak tick at holdDb.
+// lime below -6 dBFS and magenta above, and the white peak tick at holdDb. One path (one fill) per colour: the segments
+// never overlap, so this draws exactly what a fill per segment did.
 inline void ladder (NVGcontext* vg, float x, float y, float w, float h, float db, float holdDb, bool litPass)
 {
     const float seg = h / meter::segments, gap = std::min (mm2px (0.25f), seg * 0.3f);
     const int n = litPass ? meter::lit (db) : meter::segments;
-    for (int i = 0; i < n; ++i)
-        fillRect (vg, x, y + h - (i + 1) * seg + gap / 2, w, seg - gap, ! litPass ? INK : meter::hot (i) ? MAGENTA : LIME);
+    for (int pass = 0; pass < (litPass ? 2 : 1); ++pass)   // dark: ink; lit: lime, then magenta
+    {
+        bool any = false;
+        nvgBeginPath (vg);
+        for (int i = 0; i < n; ++i)
+            if (! litPass || meter::hot (i) == (pass == 1))
+            {
+                nvgRect (vg, x, y + h - (i + 1) * seg + gap / 2, w, seg - gap);
+                any = true;
+            }
+        if (! any) continue;
+        nvgFillColor (vg, ! litPass ? INK : pass ? MAGENTA : LIME);
+        nvgFill (vg);
+    }
     if (litPass && holdDb > meter::floorDb)
         fillRect (vg, x, y + h - meter::ladderPos (holdDb) / meter::segments * h, w, std::max (1.f, mm2px (0.3f)), WHITE);
 }
@@ -139,12 +152,13 @@ struct MasterDisplay : Widget
         }
         const int n = meter::History::columns;
         const float cw = hw / n;
+        const int h0 = st ? st->history.head : 0;   // read once: the audio thread may advance it while we draw
         for (int hotPass = 0; hotPass < 2; ++hotPass)   // one path per colour
         {
             nvgBeginPath (a.vg);
             for (int k = 0; k < n; ++k)
             {
-                const float db = st ? st->history.col[(st->history.head + k) % n] : -30.f + 20.f * std::sin (k * 0.35f);
+                const float db = st ? st->history.col[(h0 + k) % n] : -30.f + 20.f * std::sin (k * 0.35f);
                 const float t = meter::ladderPos (db) / meter::segments;
                 if (t > 0.f && (db > meter::hotDb) == (hotPass == 1)) nvgRect (a.vg, hx + k * cw, hy + hh * (1.f - t), cw, hh * t);
             }

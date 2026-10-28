@@ -215,9 +215,12 @@ struct Mixer : Module
         softClip = true;
         // slewed gains are left alone: they glide to the reset params, so Initialize does not click
         sc.reset();
-        meters.clearReq.fetch_or (MeterState::clearAll);   // Initialize clears every clip latch
-        for (meter::Ballistics& b : inBal) b.reset();      // and drops every bar and peak tick
+        // Initialize clears the clip latches, bars, peak ticks, LUFS and history (the engine holds its lock, so the audio thread is not mid-block)
+        meters.clearReq.fetch_or (MeterState::clearAll);
+        for (meter::Ballistics& b : inBal) b.reset();
         for (meter::Ballistics& b : outBal) b.reset();
+        loudness.reset();
+        meters.history.reset();
     }
 
     json_t* dataToJson() override
