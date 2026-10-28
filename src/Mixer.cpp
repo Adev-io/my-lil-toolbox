@@ -13,9 +13,14 @@ struct GainQuantity : ParamQuantity
     float getDisplayValue() override
     {
         const float g = mixer::levelGain (getValue());
-        return g > 0.f ? 20.f * std::log10 (g) : -INFINITY;
+        const float db = 20.f * std::log10 (g);
+        return g > 0.f ? (std::fabs (db) < 1e-3f ? 0.f : db) : -INFINITY;   // 0 dB snapped: 2 k^2 is 0.99999994 at the default
     }
-    void setDisplayValue (float db) override { setValue (std::sqrt (std::pow (10.f, db / 20.f) / 2.f)); }
+    void setDisplayValue (float db) override
+    {
+        if (std::isnan (db)) return;   // as ParamQuantity's own guard: NaN would clamp to +6 dB
+        setValue (std::sqrt (std::pow (10.f, db / 20.f) / 2.f));
+    }
 };
 
 struct Mixer : Module
@@ -87,10 +92,8 @@ struct Mixer : Module
         bool anySolo = false;
         for (int i = 0; i < N; ++i) anySolo = anySolo || params[SOLO_PARAM + i].getValue() > 0.5f;
 
-        float env = 0.f;   // SC IN unpatched: nothing ducks
-        if (inputs[SC_INPUT].isConnected())
-            env = sc.process (inputs[SC_INPUT].getVoltage(), triggerMode, mixer::releaseOf (params[RELEASE_PARAM].getValue()), args.sampleTime);
-        else sc.reset();
+        // SC IN unpatched reads 0 V, so the envelope releases (no jump when the cable is pulled)
+        const float env = sc.process (inputs[SC_INPUT].getVoltage(), triggerMode, mixer::releaseOf (params[RELEASE_PARAM].getValue()), args.sampleTime);
 
         float busL = 0.f, busR = 0.f, s1L = 0.f, s1R = 0.f, s2L = 0.f, s2R = 0.f;
         for (int i = 0; i < N; ++i)
@@ -156,10 +159,9 @@ struct Mixer : Module
         Module::onReset (e);
         triggerMode = preFader = false;
         softClip = true;
-        for (mixer::Strip& s : strips) s.reset();
+        // slewed gains are left alone: they glide to the reset params, so Initialize does not click
         sc.reset();
         for (float& p : peaks) p = 0.f;
-        masterGain = 0.f;
     }
 
     json_t* dataToJson() override
