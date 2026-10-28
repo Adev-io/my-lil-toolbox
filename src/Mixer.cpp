@@ -1,9 +1,12 @@
 // Mixer.cpp: the Rack module. Eight stereo strips into a master bus, two send/return pairs and one sidechain that ducks
-// every strip by its DUCK knob. Every gain, pan, duck, meter and clip decision comes from core/Mixer.h.
+// every strip by its DUCK knob. Every gain, pan, duck and clip decision comes from core/Mixer.h, every meter reading
+// from core/Meter.h (drawn by MixerWidgets.hpp).
 // Author: Ari Klopfer / A_Development · MIT
 #include "plugin.hpp"
 #include "layout.hpp"
 #include "Mixer.h"
+#include "Meter.h"
+#include "MixerWidgets.hpp"
 #include "TalkingFace.hpp"
 static_assert (layout::mixer::STRIPS == mixer::numStrips, "tools/panel.py strip count must match core/Mixer.h");
 
@@ -30,14 +33,19 @@ struct Mixer : Module
         ENUMS (MUTE_PARAM, N), ENUMS (SOLO_PARAM, N), MASTER_PARAM, RELEASE_PARAM, PARAMS_LEN };
     enum InputId { ENUMS (L_INPUT, N), ENUMS (R_INPUT, N), SC_INPUT, RETURN1_L_INPUT, RETURN1_R_INPUT, RETURN2_L_INPUT, RETURN2_R_INPUT, INPUTS_LEN };
     enum OutputId { OUT_L_OUTPUT, OUT_R_OUTPUT, SEND1_L_OUTPUT, SEND1_R_OUTPUT, SEND2_L_OUTPUT, SEND2_R_OUTPUT, OUTPUTS_LEN };
-    enum LightId { ENUMS (MUTE_LIGHT, N), ENUMS (SOLO_LIGHT, N), ENUMS (SIGNAL_LIGHT, 2 * N), LIGHTS_LEN };
+    enum LightId { ENUMS (MUTE_LIGHT, N), ENUMS (SOLO_LIGHT, N), ENUMS (SIGNAL_LIGHT, 2 * N), LIGHTS_LEN };   // SIGNAL: retired (v1's level light), kept so ids never move
 
     mixer::Strip strips[N];
     mixer::Sidechain sc;
-    float peaks[N] = {};
     float masterGain = 0.f;   // slewed MASTER gain
-    float sampleRate = 0.f, step = 0.f, peakCoef = 0.f;
-    FaceTap face;   // the mascot's mouth: the master out
+    float sampleRate = 0.f, step = 0.f;
+    FaceTap face;            // the band mascot's mouth: the master out
+    FaceTap stripFace[N];    // each strip's mouth: its post-fader out
+    MeterState meters;       // what the meters show, refreshed every light block
+    meter::Ballistics inBal[N], outBal[2];
+    meter::ClipLatch inClip[N], outClip;
+    meter::Loudness loudness;
+    float inPeak[N] = {}, outPeak[2] = {}, envPeak = 0.f;   // this light block's peaks
     dsp::ClockDivider lightDiv;
     bool triggerMode = false;   // context menu: SC IN reads triggers (else audio, followed)
     bool preFader = false;      // context menu: sends tap pre-fader (else post-fader)
@@ -95,7 +103,8 @@ struct Mixer : Module
         {
             sampleRate = args.sampleRate;
             step = mixer::slewStep (args.sampleTime);
-            peakCoef = mixer::peakCoef (args.sampleTime);
+            loudness.setRate (sampleRate);
+            meters.history.setRate (sampleRate);
         }
         bool anySolo = false;
         for (int i = 0; i < N; ++i) anySolo = anySolo || params[SOLO_PARAM + i].getValue() > 0.5f;
@@ -121,7 +130,8 @@ struct Mixer : Module
             s1R += tapR * g1;
             s2L += tapL * g2;
             s2R += tapR * g2;
-            peaks[i] = mixer::peak (peaks[i], std::fmax (std::fabs (oL), std::fabs (oR)), peakCoef);
+            inPeak[i] = std::fmax (inPeak[i], std::fmax (std::fabs (mixer::finite (l)), std::fabs (mixer::finite (r))));   // the input, pre-fader, before the duck
+            stripFace[i].push (clamp ((oL + oR) / 10.f, -1.f, 1.f), args.sampleRate);
         }
         float rl, rr;
         returnOf (RETURN1_L_INPUT, RETURN1_R_INPUT, rl, rr);
@@ -145,21 +155,57 @@ struct Mixer : Module
         outputs[SEND2_L_OUTPUT].setVoltage (s2L);
         outputs[SEND2_R_OUTPUT].setVoltage (s2R);
         face.push (clamp ((outL + outR) / 10.f, -1.f, 1.f), args.sampleRate);
+        outPeak[0] = std::fmax (outPeak[0], std::fabs (outL));
+        outPeak[1] = std::fmax (outPeak[1], std::fabs (outR));
+        envPeak = std::fmax (envPeak, env);
+        loudness.process (outL, outR);
+        meters.history.process (std::fmax (std::fabs (outL), std::fabs (outR)));
 
-        if (lightDiv.process()) setLights();
+        if (lightDiv.process())
+        {
+            setLights();
+            updateMeters (args.sampleTime * lightDiv.getDivision());
+        }
     }
 
-    // MUTE magenta, SOLO lime while latched; signal light lime by level, magenta above 5 V (hot)
+    // MUTE magenta, SOLO lime while latched
     void setLights()
     {
         for (int i = 0; i < N; ++i)
         {
             lights[MUTE_LIGHT + i].setBrightness (params[MUTE_PARAM + i].getValue() > 0.5f ? 1.f : 0.f);
             lights[SOLO_LIGHT + i].setBrightness (params[SOLO_PARAM + i].getValue() > 0.5f ? 1.f : 0.f);
-            const bool hot = peaks[i] > mixer::hotV;
-            lights[SIGNAL_LIGHT + 2 * i].setBrightness (hot ? 0.f : peaks[i] / mixer::hotV);
-            lights[SIGNAL_LIGHT + 2 * i + 1].setBrightness (hot ? 1.f : 0.f);
         }
+    }
+
+    // Once per light block (dt seconds): the block's peaks through the ballistics and clip latches into `meters`, the
+    // duck readout from the block's deepest envelope, the loudness. Clears the latches a click or Initialize asked for.
+    void updateMeters (float dt)
+    {
+        const uint32_t clear = meters.clearReq.exchange (0);
+        for (int i = 0; i < N; ++i)
+        {
+            if (clear & (MeterState::clearAll | 1u << i)) inClip[i].clear();
+            inBal[i].process (meter::dbfs (inPeak[i]), dt);
+            inClip[i].process (inPeak[i]);
+            meters.stripDb[i] = inBal[i].level;
+            meters.stripHoldDb[i] = inBal[i].hold;
+            meters.stripClip[i] = inClip[i].on;
+            meters.duckDb[i] = meter::duckDb (params[DUCK_PARAM + i].getValue(), envPeak);
+            inPeak[i] = 0.f;
+        }
+        if (clear & MeterState::clearAll) outClip.clear();
+        for (int c = 0; c < 2; ++c)
+        {
+            outBal[c].process (meter::dbfs (outPeak[c]), dt);
+            outClip.process (outPeak[c]);
+            meters.masterDb[c] = outBal[c].level;
+            meters.masterHoldDb[c] = outBal[c].hold;
+            outPeak[c] = 0.f;
+        }
+        meters.masterClip = outClip.on;
+        meters.lufs = loudness.value;
+        envPeak = 0.f;
     }
 
     void onReset (const ResetEvent& e) override   // the base resets params first
@@ -169,7 +215,9 @@ struct Mixer : Module
         softClip = true;
         // slewed gains are left alone: they glide to the reset params, so Initialize does not click
         sc.reset();
-        for (float& p : peaks) p = 0.f;
+        meters.clearReq.fetch_or (MeterState::clearAll);   // Initialize clears every clip latch
+        for (meter::Ballistics& b : inBal) b.reset();      // and drops every bar and peak tick
+        for (meter::Ballistics& b : outBal) b.reset();
     }
 
     json_t* dataToJson() override
@@ -208,21 +256,39 @@ struct MixerWidget : ModuleWidget
         namespace L = layout::mixer;
         auto at = [] (const float* mm) { return mm2px (Vec (mm[0], mm[1])); };
         auto strip = [] (const float* first, int i) { return mm2px (Vec (first[0] + i * L::STRIP_DX, first[1])); };   // strip i's part, from strip 0's
+        auto boxAt = [] (const float* centre, const float* size, float dx) {   // a layout box, px; dx moves it right, mm
+            return Rect (mm2px (Vec (centre[0] + dx - size[0] / 2, centre[1] - size[1] / 2)), mm2px (Vec (size[0], size[1]))); };
 
         for (int i = 0; i < Mixer::N; ++i)
         {
+            TalkingFace* f = createWidget<TalkingFace> (strip (L::STRIP_FACE0, i).minus (mm2px (Vec (L::STRIP_FACE_R, L::STRIP_FACE_R))));
+            f->box.size = mm2px (Vec (2 * L::STRIP_FACE_R, 2 * L::STRIP_FACE_R));
+            if (module) f->tap = &module->stripFace[i];
+            addChild (f);
+            const Rect lad = boxAt (L::METER0, L::METER_SIZE, i * L::STRIP_DX), duck = boxAt (L::DUCKBAR0, L::DUCKBAR_SIZE, i * L::STRIP_DX);
+            StripMeter* m = new StripMeter;
+            m->box = lad.expand (duck);
+            m->ladderBox = Rect (lad.pos.minus (m->box.pos), lad.size);
+            m->duckBox = Rect (duck.pos.minus (m->box.pos), duck.size);
+            m->strip = i;
+            if (module) m->st = &module->meters;
+            addChild (m);
+
             addParam (createParamCentered<BefacoTinyKnob> (strip (L::SEND1_0_PARAM, i), module, Mixer::SEND1_PARAM + i));
             addParam (createParamCentered<BefacoTinyKnob> (strip (L::SEND2_0_PARAM, i), module, Mixer::SEND2_PARAM + i));
             addParam (createParamCentered<BefacoTinyKnob> (strip (L::DUCK0_PARAM, i), module, Mixer::DUCK_PARAM + i));
             addParam (createParamCentered<BefacoTinyKnob> (strip (L::PAN0_PARAM, i), module, Mixer::PAN_PARAM + i));
             addParam (createParamCentered<VCVSlider> (strip (L::LEVEL0_PARAM, i), module, Mixer::LEVEL_PARAM + i));
-            addChild (createLightCentered<SmallSimpleLight<LimeMagentaLight>> (strip (L::SIGNAL0_LIGHT, i), module, Mixer::SIGNAL_LIGHT + 2 * i));
             addParam (createLightParamCentered<VCVLightLatch<MediumSimpleLight<MagentaLight>>> (strip (L::MUTE0_PARAM, i), module, Mixer::MUTE_PARAM + i, Mixer::MUTE_LIGHT + i));
             addParam (createLightParamCentered<VCVLightLatch<MediumSimpleLight<LimeLight>>> (strip (L::SOLO0_PARAM, i), module, Mixer::SOLO_PARAM + i, Mixer::SOLO_LIGHT + i));
             addInput (createInputCentered<PJ301MPort> (strip (L::L0_INPUT, i), module, Mixer::L_INPUT + i));
             addInput (createInputCentered<PJ301MPort> (strip (L::R0_INPUT, i), module, Mixer::R_INPUT + i));
         }
 
+        MasterDisplay* d = new MasterDisplay;
+        d->box = boxAt (L::DISPLAY, L::DISPLAY_SIZE, 0.f);
+        if (module) d->st = &module->meters;
+        addChild (d);
         addParam (createParamCentered<Rogan3PSWhite> (at (L::MASTER_PARAM), module, Mixer::MASTER_PARAM));
         addParam (createParamCentered<BefacoTinyKnob> (at (L::RELEASE_PARAM), module, Mixer::RELEASE_PARAM));
         static const float* const ins[5] = { L::SC_INPUT, L::RETURN1_L_INPUT, L::RETURN1_R_INPUT, L::RETURN2_L_INPUT, L::RETURN2_R_INPUT };
