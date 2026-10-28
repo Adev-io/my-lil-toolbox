@@ -1030,6 +1030,11 @@ void testMixer()
         const float nan = std::numeric_limits<float>::quiet_NaN();
         s.process (nan, nan, true, mixer::unityKnob, 0.f, true, 0.f, 0.f, step, ol, orr, pl, pr);
         check (ol == 0.f && orr == 0.f && pl == 0.f && pr == 0.f, "mixer: NaN in reads as 0 V");
+        for (int i = 0; i < 480; ++i) s.process (1.f, 1.f, false, mixer::unityKnob, 1.f, true, 0.f, 0.f, step, ol, orr, pl, pr);
+        check (near (ol, 0.f) && near (orr, 1.f, 1e-3), "mixer: strip follows a PAN move (cached gains refresh)", ol);
+        for (int i = 0; i < 480; ++i) s.process (1.f, 1.f, false, mixer::unityKnob, 0.f, true, 0.f, 0.f, step, ol, orr, pl, pr);
+        for (int i = 0; i < 480; ++i) s.process (1.f, 1.f, true, mixer::unityKnob, 0.f, true, 0.f, 0.f, step, ol, orr, pl, pr);
+        check (near (ol, 1.f, 1e-3) && near (orr, 1.f, 1e-3), "mixer: strip follows a mono/stereo change (cached gains refresh)", ol);
     }
     {
         mixer::Sidechain sc;
@@ -1061,10 +1066,15 @@ void testMixer()
         check (! t.rising, "mixer: trigger, 0.99 V does not fire");
         t.process (1.f, true, rel, dt);
         check (t.rising, "mixer: trigger, 1 V fires");
-        for (int i = 0; i < 100; ++i) t.process (10.f, true, rel, dt);
+        for (int i = 0; i < 4800; ++i) t.process (10.f, true, rel, dt);
         t.process (0.5f, true, rel, dt);
         t.process (10.f, true, rel, dt);
         check (! t.rising, "mixer: trigger, a dip to 0.5 V is not a new edge (0.1 V hysteresis)");
+        mixer::Sidechain u;
+        for (int i = 0; i < 4800; ++i) u.process (10.f, true, rel, dt);
+        u.process (0.05f, true, rel, dt);
+        u.process (10.f, true, rel, dt);
+        check (u.rising, "mixer: trigger, a dip below 0.1 V re-arms");
     }
     {
         mixer::Sidechain m;
@@ -1082,7 +1092,7 @@ void testMixer()
     {
         mixer::Sidechain z;
         for (int i = 0; i < 480; ++i) z.process (5.f, false, 0.02f, dt);
-        for (int i = 0; i < 48000 * 3; ++i) z.process (0.f, false, 0.02f, dt);
+        for (int i = 0; i < 48000 / 2; ++i) z.process (0.f, false, 0.02f, dt);
         check (z.env == 0.f, "mixer: the envelope settles to exactly 0", z.env);
     }
     check (near (mixer::releaseOf (0.f), 0.02) && near (mixer::releaseOf (1.f), 1.0, 1e-4) && near (mixer::releaseOf (mixer::knobOfRelease (0.15f)), 0.15, 1e-4),
