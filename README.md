@@ -97,7 +97,7 @@ and play a pitch CV into A CV for one pass to capture a line.
 
 Eight stereo strips into a master bus, with two sends and returns and one sidechain that ducks every strip. 26 HP.
 
-- Per strip: **IN L** and **IN R** (unpatched R copies L; poly cables are summed), **LEVEL** fader (0 dB at the default,
+- Per strip: inputs **L** and **R** (unpatched R copies L; poly cables are summed, with no clipping before LEVEL), **LEVEL** fader (0 dB at the default,
   +6 dB at the top), **PAN** (a mono source pans at constant power, a stereo source balances), **SEND 1** and **SEND 2**,
   **DUCK**, **M** (mute) and **S** (solo). Any solo plays only the soloed strips; mute always wins. The light over M
   shows the strip's level, magenta when it runs above 5 V.
@@ -105,9 +105,9 @@ Eight stereo strips into a master bus, with two sends and returns and one sidech
   fast it comes back (20 ms to 1 s). Patch the kick into SC and turn up DUCK on the bass and pads for the house pump;
   leave the kick's own strip at 0.
 - **SND1** and **SND2** are stereo sends, **RTN1** and **RTN2** stereo returns summed into the master at unity
-  (unpatched R copies L). **MASTER** sets the output level; **OUT L** and **OUT R** are the mix.
+  (unpatched R copies L). **MASTER** sets the output level; **OUT L** and **OUT R** are the mix. Sends are not clipped.
 - Context menu: **SC IN reads** Audio (an envelope follower, the default) or Triggers (each rising edge fires one
-  duck, so the pump stays even whatever the kick's level); **Sends pre-fader** (off: post-fader); **Master soft clip**
+  duck, so the pump stays even whatever the kick's level); **Sends pre-fader** (off: post-fader; pre-fader sends ignore LEVEL, PAN and mute); **Master soft clip**
   (on by default: untouched up to 5 V, then a smooth bend that never passes 8 V).
 
 Patch idea: Drums kick into strip 1 and into SC, an acid line into strip 2 with DUCK at 70 %, a pad into strip 3 with
