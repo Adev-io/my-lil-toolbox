@@ -59,7 +59,7 @@ def text(s, x, y, size, fill, anchor='middle', stroke=0.0):
 TITLE_X, TITLE_Y, TITLE_SIZE = 11.2, 6.3, 4.3
 MASCOT_X = W - 14.46   # 46.5 on 12 HP
 MASCOT_R = BAND * 0.36
-HP = {'Slider': 18, 'Ripple': 16}   # panel width per module, 12 HP unless named here
+HP = {'Slider': 18, 'Ripple': 16, 'Mixer': 26}   # panel width per module, 12 HP unless named here
 
 
 def use(name):
@@ -241,8 +241,46 @@ def slider_extras():
     ]
 
 
+# ---- Mixer (26 HP): eight strip columns (SEND 1, SEND 2, DUCK, PAN, LEVEL fader, signal light, MUTE, SOLO, IN L, IN R),
+# rows captioned in the left margin, strip numbers on top; the master section right of a divider. Built on its own
+# width MW, never the global W. Strip parts carry no labels: the captions and numbers name them.
+MW = 5.08 * 26
+STRIP_DX = 11.0
+MIX_X = [10.5 + STRIP_DX * i for i in range(8)]   # strip columns, 11 mm apart (the widget steps by STRIP_DX from strip 0)
+ROW_S1, ROW_S2, ROW_DUCK, ROW_PAN, ROW_LEVEL = 19.0, 28.8, 38.6, 48.4, 67.5
+ROW_SIG, ROW_MUTE, ROW_SOLO, ROW_INL, ROW_INR = 83.0, 87.8, 95.0, 106.0, 117.6
+MC = (101.0, 112.0, 123.0)   # master columns
+MIXER_ZONE_Y = 100.0
+MIXER = [part for i, x in enumerate(MIX_X) for part in (
+    ('SEND1_%d_PARAM' % i, 'tiny', x, ROW_S1, ''), ('SEND2_%d_PARAM' % i, 'tiny', x, ROW_S2, ''),
+    ('DUCK%d_PARAM' % i, 'tiny', x, ROW_DUCK, ''), ('PAN%d_PARAM' % i, 'tiny', x, ROW_PAN, ''),
+    ('LEVEL%d_PARAM' % i, 'slider', x, ROW_LEVEL, ''), ('SIGNAL%d_LIGHT' % i, 'light', x, ROW_SIG, ''),
+    ('MUTE%d_PARAM' % i, 'button', x, ROW_MUTE, ''), ('SOLO%d_PARAM' % i, 'button', x, ROW_SOLO, ''),
+    ('L%d_INPUT' % i, 'play', x, ROW_INL, ''), ('R%d_INPUT' % i, 'play', x, ROW_INR, ''))] + [
+    ('MASTER_PARAM', 'hero', (MC[0] + MC[1]) / 2, 22.0, 'MASTER'), ('RELEASE_PARAM', 'tiny', MC[2], 22.0, 'REL'),
+    ('SC_INPUT', 'seq', MC[0], 44.0, 'SC'),
+    ('RETURN1_L_INPUT', 'play', MC[1], 44.0, 'RTN1 L'), ('RETURN1_R_INPUT', 'play', MC[2], 44.0, 'RTN1 R'),
+    ('RETURN2_L_INPUT', 'play', MC[1], 59.5, 'RTN2 L'), ('RETURN2_R_INPUT', 'play', MC[2], 59.5, 'RTN2 R'),
+    ('SEND1_L_OUTPUT', 'out', MC[1], 75.0, 'SND1 L'), ('SEND1_R_OUTPUT', 'out', MC[2], 75.0, 'SND1 R'),
+    ('SEND2_L_OUTPUT', 'out', MC[1], 90.5, 'SND2 L'), ('SEND2_R_OUTPUT', 'out', MC[2], 90.5, 'SND2 R'),
+    ('OUT_L_OUTPUT', 'out', MC[1], 110.0, 'OUT L'), ('OUT_R_OUTPUT', 'out', MC[2], 110.0, 'OUT R'),
+]
+
+
+def mixer_extras():
+    return [
+        '<rect x="%g" y="%g" width="%g" height="23.7" rx="2" fill="%s"/>' % (ZONE_X, MIXER_ZONE_Y, MW - 2 * ZONE_X, INK2),   # jack zone, bottom at 123.7
+        '<rect x="94.6" y="14.6" width="0.4" height="83" fill="%s"/>' % DIM,   # divider: the master section
+    ] + ['<rect x="%g" y="%g" width="4.2" height="%g" rx="1" fill="%s"/>' % (x - 2.1, ROW_LEVEL - SLIDER_BOX[1] / 2, SLIDER_BOX[1], INK2)
+         for x in MIX_X] + [text(str(i + 1), x, 13.6, 2.8, LIME, stroke=0.2) for i, x in enumerate(MIX_X)] + [
+        caption(s, y) for s, y in (('SEND 1', ROW_S1), ('SEND 2', ROW_S2), ('DUCK', ROW_DUCK), ('PAN', ROW_PAN), ('LEVEL', ROW_LEVEL),
+                                   ('M', ROW_MUTE), ('S', ROW_SOLO), ('L', ROW_INL), ('R', ROW_INR))]
+
+
 MODULES = {'Arpeggio': ('MY LIL ARPEGGIO', ARPEGGIO, arpeggio_extras, ARPEGGIO_ZONE_Y), 'Ripple': ('MY LIL RIPPLE', RIPPLE, ripple_extras, RIPPLE_ZONE_Y),
-           'Filter': ('MY LIL FILTER', FILTER, filter_extras, FILTER_ZONE_Y), 'Slider': ('MY LIL SLIDER', SLIDER, slider_extras, SLIDER_ZONE_Y)}
+           'Filter': ('MY LIL FILTER', FILTER, filter_extras, FILTER_ZONE_Y), 'Slider': ('MY LIL SLIDER', SLIDER, slider_extras, SLIDER_ZONE_Y),
+           'Mixer': ('MY LIL MIXER', MIXER, mixer_extras, MIXER_ZONE_Y)}
+EXTRA_CONSTS = {'Mixer': ['constexpr float STRIP_DX = %.2ff;   // strip column pitch: strip i sits at strip 0 + i * STRIP_DX' % STRIP_DX]}
 
 
 def reach(kind):
@@ -365,6 +403,7 @@ def header():
         lines += ['namespace %s {' % name.lower()]
         lines += ['constexpr float %s[2] = {%.2ff, %.2ff};' % (i, x, y) for i, _, x, y, _ in layout]
         lines += ['constexpr float FACE[3] = {%.2ff, %.2ff, %.3ff};   // mascot centre x, y, radius (TalkingFace)' % (MASCOT_X, BAND / 2, MASCOT_R)]
+        lines += EXTRA_CONSTS.get(name, [])
         lines += ['}']
     use('')
     lines += ['}', '']
