@@ -1253,6 +1253,31 @@ void testMeter()
     check (near (meter::duckDb (0.9f, 1.f), -20.0, 0.01) && meter::duckDb (1.f, 1.f) == -24.f, "meter: the duck bar bottoms out at -24 dB", meter::duckDb (1.f, 1.f));
 }
 
+void testKeyLock()
+{
+    const uint16_t eDorian = maskOf ({ 1, 2, 4, 6, 7, 9, 11 });
+    scale::KeyLock lock;
+    int last = 3;
+    check (scale::keysStep (eDorian, 0, last, false, 0, lock) == scale::preset (0) && last == 0, "keys: unlocked TYPE move loads its preset");
+    last = 3;
+    check (scale::keysStep (eDorian, 3, last, true, 0x0F0, lock) == 0x0F0, "keys: unlocked RANDOM rolls");
+    check (scale::keysStep (eDorian, 3, last, false, 0, lock) == eDorian, "keys: unlocked and untouched, keys hold");
+
+    lock.engage (eDorian);
+    check (lock.on && lock.mask == eDorian, "keys: engage stores the current keys");
+    last = 3;
+    check (scale::keysStep (eDorian, 0, last, false, 0, lock) == eDorian, "keys: locked TYPE move is ignored");
+    check (last == 0, "keys: locked TYPE move is still tracked");
+    check (scale::keysStep (eDorian, 0, last, true, 0x0F0, lock) == eDorian, "keys: locked RANDOM is ignored");
+    check (scale::keysStep (scale::preset (0), 0, last, false, 0, lock) == eDorian, "keys: locked key click bounces back");
+    int fresh = -1;   // Initialize: params reset (keys off, TYPE 0) and lastType = -1
+    check (scale::keysStep (0, 0, fresh, false, 0, lock) == eDorian, "keys: locked Initialize restores the scale");
+
+    lock.release();
+    check (! lock.on, "keys: release unlocks");
+    check (scale::keysStep (eDorian, 0, last, false, 0, lock) == eDorian, "keys: unlocking after a TYPE move loads nothing");
+}
+
 int main()
 {
     sliderChecks();
@@ -1281,6 +1306,7 @@ int main()
     testEnv();
     testMixer();
     testMeter();
+    testKeyLock();
     // ---- calls (each task adds its calls above this line)
     std::printf ("\n%s: %d failure(s)\n", failures ? "FAILED" : "PASSED", failures);
     return failures ? 1 : 0;

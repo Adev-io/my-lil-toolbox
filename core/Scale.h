@@ -92,4 +92,22 @@ inline uint16_t randomMask (Rng& rng)
         if (rng.next() & 0x80000000u) m |= (uint16_t) (1u << k);
     return m;
 }
+// Scale lock. While on, the keys are pinned to `mask`: key clicks, TYPE, RANDOM, Randomize and Initialize cannot move them.
+struct KeyLock
+{
+    bool on = false;
+    uint16_t mask = 0;
+    void engage (uint16_t keys) { mask = keys; on = true; }   // mask first: the audio thread may read between the two
+    void release() { on = false; }
+};
+
+// One sample of the scale logic. keys: the latches as they read now. typeIdx: this sample's TYPE index (pass lastType
+// while TYPE settles after a load). A TYPE move updates lastType even while locked, so unlocking never loads a preset late.
+// Returns the keys to hold.
+inline uint16_t keysStep (uint16_t keys, int typeIdx, int& lastType, bool randHit, uint16_t randMask, const KeyLock& lock)
+{
+    if (typeIdx != lastType) { lastType = typeIdx; if (! lock.on) keys = preset (typeIdx); }
+    if (randHit && ! lock.on) keys = randMask;
+    return lock.on ? lock.mask : keys;
+}
 }
