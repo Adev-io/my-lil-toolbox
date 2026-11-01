@@ -27,6 +27,10 @@ AXIS transposes both outputs by -12..+12 semitones (CV: 1 V/oct) (knob + CV, -12
 **Gates.** Context menu "TRIG outs send gates (half the clock period)": TRIG out goes high on each trigger for half
 the time since the last one (10 ms for the first, 1 ms..2 s), for voices that hold a note on a gate. Off by default.
 
+**Lock.** Context menu "Lock scale (keys, TYPE and RANDOM)" pins the 12 keys as they are. While locked, key clicks bounce
+back, TYPE and RANDOM (knob, button and CV) do nothing, and Randomize and Initialize leave the scale alone. The lock
+survives Initialize and saves with the patch. Off by default.
+
 **B follows A.** Unpatched B CV and B TRIG read A's, so with nothing in B you get A plus INTERVAL.
 
 **Lights.** Dim keys are in the scale; lime is A's note, blue is B's (both colors when they share a key), shown before AXIS. The DIR lights show U, D, UD or RND.

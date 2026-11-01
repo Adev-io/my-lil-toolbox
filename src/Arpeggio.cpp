@@ -28,6 +28,7 @@ struct Arpeggio : Module
     int dir = arp::UP;
     bool passThrough = false;
     bool gateOuts = false;   // TRIG outs send gates (half the clock period) instead of 1 ms pulses
+    scale::KeyLock keyLock;   // context menu "Lock scale": pins the 12 keys
 
     Arpeggio()
     {
@@ -65,21 +66,26 @@ struct Arpeggio : Module
         for (int i = 0; i < 12; ++i) params[KEY_PARAM + i].setValue ((mask >> i) & 1u ? 1.f : 0.f);
     }
 
+    uint16_t readKeys()
+    {
+        uint16_t m = 0;
+        for (int i = 0; i < 12; ++i)
+            if (params[KEY_PARAM + i].getValue() > 0.5f) m |= (uint16_t) (1u << i);
+        return m;
+    }
+
     void process (const ProcessArgs& args) override
     {
-        // the scale: TYPE loads a preset when its index changes, RANDOM rolls one, the key latches hold it
+        // the scale: TYPE loads a preset when its index changes, RANDOM rolls one, the key latches hold it; a lock pins them
+        int t = lastType;
         if (typeSettle > 0) --typeSettle;
-        else
-        {
-            const int t = scale::typeIndex (params[TYPE_PARAM].getValue() + scale::clampV (inputs[TYPE_INPUT].getVoltage()), lastType);
-            if (t != lastType) { lastType = t; setKeys (scale::preset (t)); }
-        }
+        else t = scale::typeIndex (params[TYPE_PARAM].getValue() + scale::clampV (inputs[TYPE_INPUT].getVoltage()), lastType);
         const bool randPressed = randBtn.process (params[RAND_PARAM].getValue() > 0.f);
         const bool randTrigged = randTrig.process (inputs[RAND_INPUT].getVoltage(), 0.1f, 1.f);
-        if (randPressed || randTrigged) setKeys (scale::randomMask (rng));
-        uint16_t mask = 0;
-        for (int i = 0; i < 12; ++i)
-            if (params[KEY_PARAM + i].getValue() > 0.5f) mask |= (uint16_t) (1u << i);
+        const bool randHit = randPressed || randTrigged;
+        const uint16_t keys = readKeys();
+        const uint16_t mask = scale::keysStep (keys, t, lastType, randHit, randHit ? scale::randomMask (rng) : 0, keyLock);
+        if (mask != keys) setKeys (mask);
 
         if (dirBtn.process (params[DIR_PARAM].getValue() > 0.f)) dir = (dir + 1) % arp::NUM_DIRS;
         if (resetTrig.process (inputs[RESET_INPUT].getVoltage(), 0.1f, 1.f)) { a.arpeggiator.reset(); b.arpeggiator.reset(); }
@@ -138,7 +144,7 @@ struct Arpeggio : Module
     void onReset (const ResetEvent& e) override   // the base resets params first: all keys off, TYPE 0
     {
         Module::onReset (e);
-        lastType = -1;   // the next sample loads major into the keys
+        lastType = -1;   // the next sample loads major into the keys, unless keyLock (which survives Initialize) pins them
         dir = arp::UP;
         passThrough = false;
         gateOuts = false;
@@ -155,6 +161,8 @@ struct Arpeggio : Module
         json_object_set_new (root, "dir", json_integer (dir));
         json_object_set_new (root, "passThrough", json_boolean (passThrough));
         json_object_set_new (root, "gateOuts", json_boolean (gateOuts));
+        json_object_set_new (root, "locked", json_boolean (keyLock.on));
+        json_object_set_new (root, "lockedMask", json_integer (keyLock.mask));
         return root;
     }
 
@@ -165,6 +173,10 @@ struct Arpeggio : Module
         if (json_t* j = json_object_get (root, "passThrough")) passThrough = json_boolean_value (j);
         gateOuts = false;   // patches saved before the toggle have no key: off
         if (json_t* j = json_object_get (root, "gateOuts")) gateOuts = json_boolean_value (j);
+        keyLock = scale::KeyLock();   // patches saved before the lock have neither key: unlocked
+        json_t* lockJ = json_object_get (root, "locked");
+        json_t* maskJ = json_object_get (root, "lockedMask");
+        if (lockJ && maskJ && json_boolean_value (lockJ)) keyLock.engage ((uint16_t) (json_integer_value (maskJ) & 0xFFF));
         gateA.reset();
         gateB.reset();
         typeSettle = 64;
@@ -219,6 +231,9 @@ struct ArpeggioWidget : ModuleWidget
         menu->addChild (new MenuSeparator);
         menu->addChild (createBoolPtrMenuItem ("Triggers pass through (quantizer mode)", "", &m->passThrough));
         menu->addChild (createBoolPtrMenuItem ("TRIG outs send gates (half the clock period)", "", &m->gateOuts));
+        menu->addChild (createBoolMenuItem ("Lock scale (keys, TYPE and RANDOM)", "",
+            [=]() { return m->keyLock.on; },
+            [=] (bool on) { if (on) m->keyLock.engage (m->readKeys()); else m->keyLock.release(); }));
     }
 };
 
