@@ -1,7 +1,7 @@
 // Gate.h: a gate from a trigger stream, for voices that hold a note while the gate is high. It rises on each trig and
-// stays high for half the last trig-to-trig period (10 ms before a period is known), clamped to 1 ms..2 s. A trig while
-// high restarts the high phase. Periods are counted in samples, so they follow the sample rate exactly.
-// ponytail: a fixed 50 %; a GATE LEN knob (fraction of the period) is the upgrade if wanted.
+// stays high for `frac` (the GATE knob, 0.05-0.95) of the last trig-to-trig period (10 ms before a period is known),
+// clamped to 1 ms..2 s. A trig while high restarts the high phase. Periods are counted in samples, so they follow the
+// sample rate exactly. 95 % at most: a gate that never falls gives the voice no new note start.
 // Author: Ari Klopfer / A_Development · MIT
 #pragma once
 #include <cmath>
@@ -15,13 +15,14 @@ struct Gate
     uint32_t since = 0;    // samples since the last trig (saturates)
     bool timed = false;    // a trig has happened, so `since` measures a period
     uint32_t left = 0;     // samples of high phase left
+    float frac = 0.5f;     // high share of the period (GATE knob); the shell clamps it to 0.05..0.95
 
     // trig: the section fired this sample. dt: sample time in seconds. Returns the gate's state this sample.
     bool process (bool trig, float dt)
     {
         if (trig)
         {
-            float len = timed ? 0.5f * since * dt : firstLen;
+            float len = timed ? frac * since * dt : firstLen;
             len = len < minLen ? minLen : len > maxLen ? maxLen : len;
             const long n = std::lround (len / dt);
             left = n < 1 ? 1u : (uint32_t) n;

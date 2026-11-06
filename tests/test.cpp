@@ -667,6 +667,18 @@ void testGate()
         g.reset();
         check (highOnly (runGate (g, 100, { 0 }), 0, 10), "gate: after reset the first trig gives 10 ms again");
     }
+    {
+        gate::Gate g;
+        g.frac = 0.25f;
+        const std::vector<bool> h = runGate (g, 300, { 0, 100, 200 });
+        check (highOnly (h, 200, 225), "gate: frac 0.25 of a 100 ms period gives 25 ms");
+    }
+    {
+        gate::Gate g;
+        g.frac = 0.95f;
+        const std::vector<bool> h = runGate (g, 300, { 0, 100, 200 });
+        check (h[294] && ! h[295], "gate: frac 0.95 falls before the next step");
+    }
 }
 // Peak output of a sine through a fresh filter: 0.5 s to settle, then the peak of the next 0.25 s. 44.1 kHz.
 const double ladderSr = 44100.0;
