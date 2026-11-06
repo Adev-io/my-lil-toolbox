@@ -24,8 +24,10 @@ that always keeps C. With every key off, CV is not quantized (TRIG still samples
 **Pitch.** INTERVAL moves B by -12..+12 *scale degrees*, so B harmonizes in key (CV: 1/12 V per degree).
 AXIS transposes both outputs by -12..+12 semitones (CV: 1 V/oct) (knob + CV, -12..+12 total). Outputs clamp to +-10 V.
 
-**Gates.** Context menu "TRIG outs send gates (half the clock period)": TRIG out goes high on each trigger for half
+**Gates.** Context menu "TRIG outs send gates (GATE sets the length)": TRIG out goes high on each trigger for GATE of
 the time since the last one (10 ms for the first, 1 ms..2 s), for voices that hold a note on a gate. Off by default.
+- **GATE** (knob + CV, 5-95 %): how long each TRIG-out gate stays high, as a share of the step. Acts with "TRIG outs send gates" on.
+- **ROLL** (hold button or gate jack) + **ROLLS** (2/3/4): while held, each step's note plays 2-4 times, evenly spread over the step.
 
 **Lock.** Context menu "Lock scale (keys, TYPE and RANDOM)" pins the 12 keys as they are. While locked, key clicks bounce
 back, TYPE and RANDOM (knob, button and CV) do nothing, and Randomize and Initialize leave the scale alone. The lock
