@@ -678,7 +678,7 @@ void testGate()
         gate::Gate g;
         g.frac = 0.95f;
         const std::vector<bool> h = runGate (g, 300, { 0, 100, 200 });
-        check (h[294] && ! h[295], "gate: frac 0.95 falls before the next step");
+        check (highOnly (h, 200, 295), "gate: frac 0.95 falls before the next step");
     }
 }
 // Peak output of a sine through a fresh filter: 0.5 s to settle, then the peak of the next 0.25 s. 44.1 kHz.
@@ -1310,6 +1310,28 @@ void testRatchet()
     { ratchet::Ratchet r; check (runRatchet (r, 300, { 0, 100, 200 }, 2) == std::vector<int> ({ 0, 100, 150, 200, 250 }), "ratchet: 2 splits each known period (not the first)"); }
     { ratchet::Ratchet r; check (runRatchet (r, 300, { 0, 100, 200 }, 4) == std::vector<int> ({ 0, 100, 125, 150, 175, 200, 225, 250, 275 }), "ratchet: 4 evenly spaced"); }
     { ratchet::Ratchet r; runRatchet (r, 140, { 0, 100 }, 2); check (runRatchet (r, 100, { 50 }, 1) == std::vector<int> ({ 50 }), "ratchet: let go mid-roll drops the repeat still waiting"); }
+    { ratchet::Ratchet r; check (runRatchet (r, 300, { 0, 100, 200 }, 3) == std::vector<int> ({ 0, 100, 133, 166, 200, 233, 266 }), "ratchet: 3 on a 100 period (remainder after the last repeat)"); }
+    { ratchet::Ratchet r; check (runRatchet (r, 10, { 0, 2, 4 }, 4) == std::vector<int> ({ 0, 2, 4 }), "ratchet: a period shorter than n fires the trigs only"); }
+    { ratchet::Ratchet r; runRatchet (r, 140, { 0, 100 }, 2); r.reset(); check (runRatchet (r, 100, { 0 }, 2) == std::vector<int> ({ 0 }), "ratchet: after reset the first trig fires once"); }
+    {   // chain: Ratchet into Gate, each fire carries its period. n = 2 only for the steps at 100 and 200.
+        ratchet::Ratchet r;
+        gate::Gate g;
+        g.frac = 0.5f;
+        std::vector<bool> h;
+        for (int i = 0; i < 400; ++i)
+        {
+            const int n = (i >= 100 && i < 300) ? 2 : 1;
+            const bool fire = r.process (i % 100 == 0, n);
+            h.push_back (g.process (fire, 1e-3f, r.period));
+        }
+        bool ok = true;
+        for (int i = 100; i < 400; ++i)
+        {
+            const bool want = (i < 125) || (i >= 150 && i < 175) || (i >= 200 && i < 225) || (i >= 250 && i < 275) || (i >= 300 && i < 350);
+            ok = ok && h[i] == want;
+        }
+        check (ok, "ratchet+gate: each repeat is its own 25 ms note, the step after the roll keeps its full 50 ms");
+    }
 }
 
 int main()
