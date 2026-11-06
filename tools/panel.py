@@ -60,7 +60,7 @@ def text(s, x, y, size, fill, anchor='middle', stroke=0.0):
 TITLE_X, TITLE_Y, TITLE_SIZE = 11.2, 6.3, 4.3
 MASCOT_X = W - 14.46   # 46.5 on 12 HP
 MASCOT_R = BAND * 0.36
-HP = {'Slider': 18, 'Ripple': 16, 'Mixer': 34}   # panel width per module, 12 HP unless named here
+HP = {'Slider': 18, 'Ripple': 16, 'Mixer': 34, 'Arpeggio': 16}   # panel width per module, 12 HP unless named here
 
 
 def use(name):
@@ -125,6 +125,9 @@ ARPEGGIO = [('KEY%d_PARAM' % pc, 'key', x, y, '') for pc, (x, y) in sorted(KEYS.
     ('B_CV_INPUT', 'play', JX[3], ROW_IN, 'CV'), ('B_TRIG_INPUT', 'seq', JX[4], ROW_IN, 'TRIG'),
     ('A_CV_OUTPUT', 'out', JX[0], ROW_OUT, 'CV'), ('A_TRIG_OUTPUT', 'out', JX[1], ROW_OUT, 'TRIG'),
     ('B_CV_OUTPUT', 'out', JX[3], ROW_OUT, 'CV'), ('B_TRIG_OUTPUT', 'out', JX[4], ROW_OUT, 'TRIG'),
+    ('GATE_PARAM', 'tiny', 70.0, ROW_TYPE, 'GATE'), ('ROLLN_PARAM', 'tiny', 70.0, ROW_MODE, 'ROLLS'),
+    ('ROLLBTN_PARAM', 'button', 70.0, ROW_AXIS, 'ROLL'),
+    ('GATE_INPUT', 'cv', 63.0, ROW_IN, 'GATE'), ('ROLL_INPUT', 'seq', 73.5, ROW_IN, 'ROLL'),
 ]
 
 
@@ -134,7 +137,7 @@ ARPEGGIO_ZONE_Y = 94.5
 
 def arpeggio_extras():
     return [
-        '<rect x="2.5" y="14.6" width="%g" height="18.4" rx="1.5" fill="none" stroke="%s" stroke-width="0.5"/>' % (W - 5, LIME),
+        '<rect x="2.5" y="14.6" width="%g" height="18.4" rx="1.5" fill="none" stroke="%s" stroke-width="0.5"/>' % (5.08 * 12 - 5, LIME),
         '<rect x="%g" y="%g" width="%g" height="29.2" rx="2" fill="%s"/>' % (ZONE_X, ARPEGGIO_ZONE_Y, W - 2 * ZONE_X, INK2),   # jack zone
         text('A', (JX[0] + JX[1]) / 2, 98.4, 2.8, LIME, stroke=0.2), text('B', (JX[3] + JX[4]) / 2, 98.4, 2.8, LIME, stroke=0.2),
     ]

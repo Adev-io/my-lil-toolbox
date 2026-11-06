@@ -5,12 +5,15 @@
 #include "layout.hpp"
 #include "Section.h"
 #include "Gate.h"
+#include "Ratchet.h"
 #include "TalkingFace.hpp"
 
 struct Arpeggio : Module
 {
-    enum ParamId { ENUMS (KEY_PARAM, 12), TYPE_PARAM, RAND_PARAM, MODE_PARAM, DIR_PARAM, OCT_PARAM, AXIS_PARAM, INT_PARAM, PARAMS_LEN };
-    enum InputId { TYPE_INPUT, RAND_INPUT, AXIS_INPUT, INT_INPUT, RESET_INPUT, A_CV_INPUT, A_TRIG_INPUT, B_CV_INPUT, B_TRIG_INPUT, INPUTS_LEN };
+    enum ParamId { ENUMS (KEY_PARAM, 12), TYPE_PARAM, RAND_PARAM, MODE_PARAM, DIR_PARAM, OCT_PARAM, AXIS_PARAM, INT_PARAM,
+                   GATE_PARAM, ROLLN_PARAM, ROLLBTN_PARAM, PARAMS_LEN };   // 2.3.0 appended GATE..ROLLBTN: saved ids keep theirs
+    enum InputId { TYPE_INPUT, RAND_INPUT, AXIS_INPUT, INT_INPUT, RESET_INPUT, A_CV_INPUT, A_TRIG_INPUT, B_CV_INPUT, B_TRIG_INPUT,
+                   GATE_INPUT, ROLL_INPUT, INPUTS_LEN };
     enum OutputId { A_CV_OUTPUT, A_TRIG_OUTPUT, B_CV_OUTPUT, B_TRIG_OUTPUT, OUTPUTS_LEN };
     enum LightId { ENUMS (KEY_LIGHT, 12 * 3), ENUMS (MODE_LIGHT, 2), ENUMS (DIR_LIGHT, arp::NUM_DIRS), LIGHTS_LEN };
 
@@ -21,13 +24,14 @@ struct Arpeggio : Module
     dsp::BooleanTrigger randBtn, dirBtn;
     dsp::PulseGenerator pulseA, pulseB;
     gate::Gate gateA, gateB;   // run always, so a period is known the moment gateOuts turns on
+    ratchet::Ratchet rollA, rollB;   // ROLL: repeats of each step's note, ahead of the pulse / gate makers
     dsp::ClockDivider lightDiv;
     FaceTap face;   // the mascot's mouth
     int lastType = -1;   // TYPE index whose preset the keys last loaded; -1 = load on the next sample
     int typeSettle = 0;   // samples to ignore TYPE after a patch load: cables read 0 V until upstream modules run
     int dir = arp::UP;
     bool passThrough = false;
-    bool gateOuts = false;   // TRIG outs send gates (half the clock period) instead of 1 ms pulses
+    bool gateOuts = false;   // TRIG outs send gates (high for GATE, the knob, of the clock period) instead of 1 ms pulses
     scale::KeyLock keyLock;   // context menu "Lock scale": pins the 12 keys
 
     Arpeggio()
@@ -45,6 +49,9 @@ struct Arpeggio : Module
         configParam (OCT_PARAM, 1.f, 4.f, 1.f, "Arp octaves")->snapEnabled = true;
         configParam (AXIS_PARAM, -12.f, 12.f, 0.f, "Axis: transpose both outputs", " semitones")->snapEnabled = true;
         configParam (INT_PARAM, -12.f, 12.f, 0.f, "Interval: B above or below A", " scale degrees")->snapEnabled = true;
+        configParam (GATE_PARAM, 0.05f, 0.95f, 0.5f, "Gate length (TRIG outs as gates)", "%", 0.f, 100.f);
+        configSwitch (ROLLN_PARAM, 2.f, 4.f, 2.f, "Roll: notes per step while ROLL is held", { "2", "3", "4" });
+        configButton (ROLLBTN_PARAM, "Roll (hold)");
         configInput (TYPE_INPUT, "Scale type CV (1 V per preset, added to the knob)");
         configInput (RAND_INPUT, "Random scale trigger");
         configInput (AXIS_INPUT, "Axis CV (1 V/oct, in semitone steps)");
@@ -54,6 +61,8 @@ struct Arpeggio : Module
         configInput (A_TRIG_INPUT, "A trigger");
         configInput (B_CV_INPUT, "B CV (A's when unpatched)");
         configInput (B_TRIG_INPUT, "B trigger (A's when unpatched)");
+        configInput (GATE_INPUT, "Gate length CV (10 V = full range, added to the knob)");
+        configInput (ROLL_INPUT, "Roll gate (repeats while high)");
         configOutput (A_CV_OUTPUT, "A CV");
         configOutput (A_TRIG_OUTPUT, "A trigger");
         configOutput (B_CV_OUTPUT, "B CV");
@@ -112,12 +121,16 @@ struct Arpeggio : Module
         s.degrees = clamp ((int) std::round (params[INT_PARAM].getValue() + scale::clampV (inputs[INT_INPUT].getVoltage()) * 12.f), -12, 12);
         const section::Out ob = b.process (cvB, edgeB, ownTrigB || patchedA, s);
 
-        if (oa.trig) pulseA.trigger (1e-3f);
-        if (ob.trig) pulseB.trigger (1e-3f);
+        const int rolls = inputs[ROLL_INPUT].getVoltage() >= 1.f || params[ROLLBTN_PARAM].getValue() > 0.f
+                        ? (int) std::round (params[ROLLN_PARAM].getValue()) : 1;
+        const bool rA = rollA.process (oa.trig, rolls), rB = rollB.process (ob.trig, rolls);
+        gateA.frac = gateB.frac = clamp (params[GATE_PARAM].getValue() + inputs[GATE_INPUT].getVoltage() / 10.f, 0.05f, 0.95f);
+        if (rA) pulseA.trigger (1e-3f);
+        if (rB) pulseB.trigger (1e-3f);
         outputs[A_CV_OUTPUT].setVoltage (oa.volts);
         outputs[B_CV_OUTPUT].setVoltage (ob.volts);
         const bool pA = pulseA.process (args.sampleTime), pB = pulseB.process (args.sampleTime);
-        const bool gA = gateA.process (oa.trig, args.sampleTime), gB = gateB.process (ob.trig, args.sampleTime);
+        const bool gA = gateA.process (rA, args.sampleTime, rollA.period), gB = gateB.process (rB, args.sampleTime, rollB.period);
         outputs[A_TRIG_OUTPUT].setVoltage ((gateOuts ? gA : pA) ? 10.f : 0.f);
         outputs[B_TRIG_OUTPUT].setVoltage ((gateOuts ? gB : pB) ? 10.f : 0.f);
         face.push (clamp ((outputs[A_CV_OUTPUT].getVoltage() + outputs[B_CV_OUTPUT].getVoltage()) / 4.f, -1.f, 1.f), args.sampleRate);
@@ -152,6 +165,7 @@ struct Arpeggio : Module
         b.arpeggiator.reset();
         gateA.reset();
         gateB.reset();
+        rollA.reset(); rollB.reset();
     }
 
     json_t* dataToJson() override
@@ -179,6 +193,7 @@ struct Arpeggio : Module
         if (lockJ && maskJ && json_boolean_value (lockJ)) keyLock.engage ((uint16_t) (json_integer_value (maskJ) & 0xFFF));
         gateA.reset();
         gateB.reset();
+        rollA.reset(); rollB.reset();
         typeSettle = 64;
     }
 };
@@ -216,9 +231,12 @@ struct ArpeggioWidget : ModuleWidget
         addParam (createParamCentered<Rogan1PSWhite> (at (L::OCT_PARAM), module, Arpeggio::OCT_PARAM));
         addParam (createParamCentered<Rogan1PSBlue> (at (L::AXIS_PARAM), module, Arpeggio::AXIS_PARAM));
         addParam (createParamCentered<Rogan1PSBlue> (at (L::INT_PARAM), module, Arpeggio::INT_PARAM));
+        addParam (createParamCentered<BefacoTinyKnob> (at (L::GATE_PARAM), module, Arpeggio::GATE_PARAM));
+        addParam (createParamCentered<BefacoTinyKnob> (at (L::ROLLN_PARAM), module, Arpeggio::ROLLN_PARAM));
+        addParam (createParamCentered<VCVButton> (at (L::ROLLBTN_PARAM), module, Arpeggio::ROLLBTN_PARAM));
 
         static const float* const ins[Arpeggio::INPUTS_LEN] = { L::TYPE_INPUT, L::RAND_INPUT, L::AXIS_INPUT, L::INT_INPUT, L::RESET_INPUT,
-            L::A_CV_INPUT, L::A_TRIG_INPUT, L::B_CV_INPUT, L::B_TRIG_INPUT };
+            L::A_CV_INPUT, L::A_TRIG_INPUT, L::B_CV_INPUT, L::B_TRIG_INPUT, L::GATE_INPUT, L::ROLL_INPUT };
         for (int i = 0; i < Arpeggio::INPUTS_LEN; ++i) addInput (createInputCentered<PJ301MPort> (at (ins[i]), module, i));
         static const float* const outs[Arpeggio::OUTPUTS_LEN] = { L::A_CV_OUTPUT, L::A_TRIG_OUTPUT, L::B_CV_OUTPUT, L::B_TRIG_OUTPUT };
         for (int i = 0; i < Arpeggio::OUTPUTS_LEN; ++i) addOutput (createOutputCentered<PJ301MPort> (at (outs[i]), module, i));
@@ -230,7 +248,7 @@ struct ArpeggioWidget : ModuleWidget
         if (! m) return;
         menu->addChild (new MenuSeparator);
         menu->addChild (createBoolPtrMenuItem ("Triggers pass through (quantizer mode)", "", &m->passThrough));
-        menu->addChild (createBoolPtrMenuItem ("TRIG outs send gates (half the clock period)", "", &m->gateOuts));
+        menu->addChild (createBoolPtrMenuItem ("TRIG outs send gates (GATE sets the length)", "", &m->gateOuts));
         menu->addChild (createBoolMenuItem ("Lock scale (keys, TYPE and RANDOM)", "",
             [=]() { return m->keyLock.on; },
             [=] (bool on) { if (on) m->keyLock.engage (m->readKeys()); else m->keyLock.release(); }));
