@@ -1309,7 +1309,7 @@ void testRatchet()
     { ratchet::Ratchet r; check (runRatchet (r, 300, { 0, 100, 200 }, 1) == std::vector<int> ({ 0, 100, 200 }), "ratchet: 1 = the trigs only"); }
     { ratchet::Ratchet r; check (runRatchet (r, 300, { 0, 100, 200 }, 2) == std::vector<int> ({ 0, 100, 150, 200, 250 }), "ratchet: 2 splits each known period (not the first)"); }
     { ratchet::Ratchet r; check (runRatchet (r, 300, { 0, 100, 200 }, 4) == std::vector<int> ({ 0, 100, 125, 150, 175, 200, 225, 250, 275 }), "ratchet: 4 evenly spaced"); }
-    { ratchet::Ratchet r; runRatchet (r, 140, { 0, 100 }, 2); check (runRatchet (r, 100, { 50 }, 1) == std::vector<int> ({ 50 }), "ratchet: let go mid-roll drops the repeat still waiting"); }
+    { ratchet::Ratchet r; runRatchet (r, 140, { 0, 100 }, 2); check (runRatchet (r, 100, { 50 }, 1) == std::vector<int> ({ 10, 50 }), "ratchet: let go keeps this step's repeats, the next step plays once"); }
     { ratchet::Ratchet r; check (runRatchet (r, 300, { 0, 100, 200 }, 3) == std::vector<int> ({ 0, 100, 133, 166, 200, 233, 266 }), "ratchet: 3 on a 100 period (remainder after the last repeat)"); }
     { ratchet::Ratchet r; check (runRatchet (r, 10, { 0, 2, 4 }, 4) == std::vector<int> ({ 0, 2, 4 }), "ratchet: a period shorter than n fires the trigs only"); }
     { ratchet::Ratchet r; runRatchet (r, 140, { 0, 100 }, 2); r.reset(); check (runRatchet (r, 100, { 0 }, 2) == std::vector<int> ({ 0 }), "ratchet: after reset the first trig fires once"); }

@@ -1,6 +1,7 @@
 // Ratchet.h: ROLL. Every input trig fires at once; with n > 1 it fires n - 1 more times, evenly spaced across the last
 // trig-to-trig period, so each step's note repeats n times. The first trig (no period yet) fires once. No Rack headers.
-// Irregular trig streams: later repeats may be cut by the next trig; n is read at each trig (n <= 1 cancels at once).
+// Irregular trig streams: later repeats may be cut by the next trig. n is read at each trig: a change, letting go
+// included, acts from the next step.
 // Author: Ari Klopfer / A_Development · MIT
 #pragma once
 #include <cstdint>
@@ -19,7 +20,6 @@ struct Ratchet
     bool process (bool trig, int n)
     {
         bool out = false;
-        if (n <= 1) left = 0;   // let go: no repeats left over from the step before
         if (trig)
         {
             out = true;

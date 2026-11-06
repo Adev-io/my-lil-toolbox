@@ -20,7 +20,7 @@ struct Arpeggio : Module
     const uint32_t seed = random::u32() | 1u;   // A and B share it: a normalled B walks A's random path, so B stays A + INTERVAL
     section::Section a { seed }, b { seed };
     scale::Rng rng { random::u32() | 1u };
-    dsp::SchmittTrigger trigA, trigB, randTrig, resetTrig;
+    dsp::SchmittTrigger trigA, trigB, randTrig, resetTrig, rollTrig;   // rollTrig: the ROLL jack's high/low, with hysteresis
     dsp::BooleanTrigger randBtn, dirBtn;
     dsp::PulseGenerator pulseA, pulseB;
     gate::Gate gateA, gateB;   // run always, so a period is known the moment gateOuts turns on
@@ -50,6 +50,7 @@ struct Arpeggio : Module
         configParam (AXIS_PARAM, -12.f, 12.f, 0.f, "Axis: transpose both outputs", " semitones")->snapEnabled = true;
         configParam (INT_PARAM, -12.f, 12.f, 0.f, "Interval: B above or below A", " scale degrees")->snapEnabled = true;
         configParam (GATE_PARAM, 0.05f, 0.95f, 0.5f, "Gate length (TRIG outs as gates)", "%", 0.f, 100.f);
+        getParamQuantity (GATE_PARAM)->randomizeEnabled = false;   // live set: a random 5 % gate surprises
         configSwitch (ROLLN_PARAM, 2.f, 4.f, 2.f, "Roll: notes per step while ROLL is held", { "2", "3", "4" });
         configButton (ROLLBTN_PARAM, "Roll (hold)");
         configInput (TYPE_INPUT, "Scale type CV (1 V per preset, added to the knob)");
@@ -61,7 +62,7 @@ struct Arpeggio : Module
         configInput (A_TRIG_INPUT, "A trigger");
         configInput (B_CV_INPUT, "B CV (A's when unpatched)");
         configInput (B_TRIG_INPUT, "B trigger (A's when unpatched)");
-        configInput (GATE_INPUT, "Gate length CV (10 V = full range, added to the knob)");
+        configInput (GATE_INPUT, "Gate length CV (10 V = 100 %, added to the knob)");
         configInput (ROLL_INPUT, "Roll gate (repeats while high)");
         configOutput (A_CV_OUTPUT, "A CV");
         configOutput (A_TRIG_OUTPUT, "A trigger");
@@ -121,7 +122,8 @@ struct Arpeggio : Module
         s.degrees = clamp ((int) std::round (params[INT_PARAM].getValue() + scale::clampV (inputs[INT_INPUT].getVoltage()) * 12.f), -12, 12);
         const section::Out ob = b.process (cvB, edgeB, ownTrigB || patchedA, s);
 
-        const int rolls = inputs[ROLL_INPUT].getVoltage() >= 1.f || params[ROLLBTN_PARAM].getValue() > 0.f
+        rollTrig.process (inputs[ROLL_INPUT].getVoltage(), 0.1f, 1.f);
+        const int rolls = rollTrig.isHigh() || params[ROLLBTN_PARAM].getValue() > 0.f
                         ? (int) std::round (params[ROLLN_PARAM].getValue()) : 1;
         const bool rA = rollA.process (oa.trig, rolls), rB = rollB.process (ob.trig, rolls);
         gateA.frac = gateB.frac = clamp (params[GATE_PARAM].getValue() + inputs[GATE_INPUT].getVoltage() / 10.f, 0.05f, 0.95f);
@@ -194,6 +196,7 @@ struct Arpeggio : Module
         gateA.reset();
         gateB.reset();
         rollA.reset(); rollB.reset();
+        params[ROLLBTN_PARAM].setValue (0.f);   // a hold never survives a reload
         typeSettle = 64;
     }
 };
