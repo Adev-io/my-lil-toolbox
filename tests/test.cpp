@@ -6,6 +6,7 @@
 #include "Rhythm.h"
 #include "FaceTap.h"
 #include "Gate.h"
+#include "Ratchet.h"
 #include "Ladder.h"
 #include "Env.h"
 #include "Slider.h"
@@ -1290,6 +1291,27 @@ void testKeyLock()
     check (scale::keysStep (eDorian, 0, last, false, 0, lock) == eDorian, "keys: unlocking after a TYPE move loads nothing");
 }
 
+// Runs a ratchet n samples with input trigs on `trigs`; returns the sample indexes where it fired.
+std::vector<int> runRatchet (ratchet::Ratchet& r, int n, std::initializer_list<int> trigs, int rolls)
+{
+    std::vector<int> out;
+    for (int i = 0; i < n; ++i)
+    {
+        bool t = false;
+        for (int x : trigs) t = t || x == i;
+        if (r.process (t, rolls)) out.push_back (i);
+    }
+    return out;
+}
+
+void testRatchet()
+{
+    { ratchet::Ratchet r; check (runRatchet (r, 300, { 0, 100, 200 }, 1) == std::vector<int> ({ 0, 100, 200 }), "ratchet: 1 = the trigs only"); }
+    { ratchet::Ratchet r; check (runRatchet (r, 300, { 0, 100, 200 }, 2) == std::vector<int> ({ 0, 100, 150, 200, 250 }), "ratchet: 2 splits each known period (not the first)"); }
+    { ratchet::Ratchet r; check (runRatchet (r, 300, { 0, 100, 200 }, 4) == std::vector<int> ({ 0, 100, 125, 150, 175, 200, 225, 250, 275 }), "ratchet: 4 evenly spaced"); }
+    { ratchet::Ratchet r; runRatchet (r, 140, { 0, 100 }, 2); check (runRatchet (r, 100, { 50 }, 1) == std::vector<int> ({ 50 }), "ratchet: let go mid-roll drops the repeat still waiting"); }
+}
+
 int main()
 {
     sliderChecks();
@@ -1319,6 +1341,7 @@ int main()
     testMixer();
     testMeter();
     testKeyLock();
+    testRatchet();
     // ---- calls (each task adds its calls above this line)
     std::printf ("\n%s: %d failure(s)\n", failures ? "FAILED" : "PASSED", failures);
     return failures ? 1 : 0;
