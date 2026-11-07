@@ -196,8 +196,15 @@ struct Arpeggio : Module
         gateA.reset();
         gateB.reset();
         rollA.reset(); rollB.reset();
-        params[ROLLBTN_PARAM].setValue (0.f);   // a hold never survives a reload
         typeSettle = 64;
+    }
+
+    // Rack calls onAdd after a patch/preset load adds the module, not on a data write to a live module,
+    // so a ROLL held from a controller survives a module-state write but never a reload.
+    void onAdd (const AddEvent& e) override
+    {
+        Module::onAdd (e);
+        params[ROLLBTN_PARAM].setValue (0.f);
     }
 };
 
