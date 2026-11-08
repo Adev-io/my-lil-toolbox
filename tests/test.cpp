@@ -12,6 +12,7 @@
 #include "Slider.h"
 #include "Mixer.h"
 #include "Meter.h"
+#include "Duck.h"
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
@@ -1334,6 +1335,43 @@ void testRatchet()
     }
 }
 
+void testDuck()
+{
+    const float dt = 1.f / 48000.f, rel = 0.15f;
+    check (duck::gain (0.f, 1.f) == 1.f, "duck: depth 0 never ducks");
+    check (duck::gain (1.f, 1.f) == 0.f, "duck: depth 100% at a full envelope is silence");
+    check (near (duck::gain (0.5f, 1.f), 0.5), "duck: half depth at a full envelope is half gain", duck::gain (0.5f, 1.f));
+    check (duck::gain (1.f, 0.f) == 1.f, "duck: no envelope, no ducking");
+    check (duck::gain (2.f, 2.f) == 0.f && duck::gain (-1.f, 1.f) == 1.f, "duck: depth and envelope clamp to 0..1");
+    {
+        duck::Ducker d;
+        check (d.process (0.f, false, 1.f, rel, dt) == 1.f, "duck: an unpatched sidechain (0 V) passes at unity");
+        int n = 0;
+        while (d.process (5.f, false, 1.f, rel, dt) > 0.05f && n < 1000) ++n;
+        check (n <= 48, "duck: follower, a 5 V step ducks to 5% within 1 ms", n);
+        for (int i = 0; i < 480; ++i) d.process (5.f, false, 1.f, rel, dt);
+        float g = 1.f;
+        for (int i = 0; i < (int) (rel * 48000); ++i) g = d.process (0.f, false, 1.f, rel, dt);
+        check (near (g, 1.0 - std::exp (-1.0), 2e-3), "duck: follower recovers to 1 - 1/e after one RELEASE", g);
+        d.reset();
+        check (d.process (0.f, false, 1.f, rel, dt) == 1.f, "duck: reset clears the envelope");
+    }
+    {
+        duck::Ducker t;
+        float g = 1.f;
+        for (int i = 0; i < 480; ++i) g = t.process (0.5f, true, 1.f, rel, dt);
+        check (g == 1.f, "duck: trigger mode, 0.5 V does not fire", g);
+        int n = 0;
+        while (t.process (5.f, true, 1.f, rel, dt) > 0.05f && n < 1000) ++n;
+        check (n <= 48, "duck: trigger mode, a rising edge ducks to 5% within 1 ms", n);
+    }
+    {
+        duck::Ducker h;
+        const float g = h.process (std::numeric_limits<float>::quiet_NaN(), false, 1.f, rel, dt);
+        check (std::isfinite (g) && g >= 0.f && g <= 1.f, "duck: a NaN sidechain reads as 0 V", g);
+    }
+}
+
 int main()
 {
     sliderChecks();
@@ -1364,6 +1402,7 @@ int main()
     testMeter();
     testKeyLock();
     testRatchet();
+    testDuck();
     // ---- calls (each task adds its calls above this line)
     std::printf ("\n%s: %d failure(s)\n", failures ? "FAILED" : "PASSED", failures);
     return failures ? 1 : 0;
