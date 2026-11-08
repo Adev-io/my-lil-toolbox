@@ -271,4 +271,15 @@ constexpr float METER_SIZE[2] = {2.20f, 25.92f};   // LED ladder box w, h (Strip
 constexpr float DUCKBAR_SIZE[2] = {1.00f, 25.92f};   // duck bar box w, h; DUCKBARi is its centre
 constexpr float DISPLAY_SIZE[2] = {51.00f, 31.00f};   // master display w, h (MasterDisplay); DISPLAY is its centre
 }
+namespace duck {
+constexpr float DEPTH_PARAM[2] = {30.48f, 32.00f};
+constexpr float RELEASE_PARAM[2] = {30.48f, 62.00f};
+constexpr float L_INPUT[2] = {12.00f, 102.00f};
+constexpr float SC_INPUT[2] = {30.48f, 102.00f};
+constexpr float R_INPUT[2] = {48.96f, 102.00f};
+constexpr float L_OUTPUT[2] = {12.00f, 115.30f};
+constexpr float DUCK_LIGHT[2] = {30.48f, 112.50f};
+constexpr float R_OUTPUT[2] = {48.96f, 115.30f};
+constexpr float FACE[3] = {46.50f, 4.30f, 3.096f};   // mascot centre x, y, radius (TalkingFace)
+}
 }

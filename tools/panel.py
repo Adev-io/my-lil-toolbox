@@ -207,6 +207,23 @@ def filter_extras():
     ]
 
 
+# ---- Duck (12 HP): DEPTH on top, RELEASE under it; the jack zone has IN L, SC, IN R on top and OUT L, the GR light, OUT R
+# along the bottom. Same zone and columns as Filter.
+DUCK_ZONE_Y = FILTER_ZONE_Y
+DUCK = [
+    ('DEPTH_PARAM', 'hero', W / 2, 32.0, 'DEPTH'),
+    ('RELEASE_PARAM', 'knob', W / 2, 62.0, 'RELEASE'),
+    ('L_INPUT', 'play', FX[0], 102.0, 'IN L'), ('SC_INPUT', 'seq', FX[1], 102.0, 'SC'), ('R_INPUT', 'play', FX[2], 102.0, 'IN R'),
+    ('L_OUTPUT', 'out', FX[0], 115.3, 'OUT L'), ('DUCK_LIGHT', 'light', FX[1], 112.5, 'GR'), ('R_OUTPUT', 'out', FX[2], 115.3, 'OUT R'),
+]
+
+
+def duck_extras():
+    return [
+        '<rect x="%g" y="%g" width="%g" height="29.2" rx="2" fill="%s"/>' % (ZONE_X, DUCK_ZONE_Y, W - 2 * ZONE_X, INK2),   # jack zone, as Filter's
+    ]
+
+
 # ---- Slider (18 HP): two sections of 8 sliders, a gate button under each; a control strip (A's LEN RNG REC INV REV,
 # CHAIN, B's five) over the jack zone. Built on its own width SW, never the global W.
 SW = 5.08 * 18
@@ -299,7 +316,8 @@ def mixer_extras():
 
 MODULES = {'Arpeggio': ('MY LIL ARPEGGIO', ARPEGGIO, arpeggio_extras, ARPEGGIO_ZONE_Y), 'Ripple': ('MY LIL RIPPLE', RIPPLE, ripple_extras, RIPPLE_ZONE_Y),
            'Filter': ('MY LIL FILTER', FILTER, filter_extras, FILTER_ZONE_Y), 'Slider': ('MY LIL SLIDER', SLIDER, slider_extras, SLIDER_ZONE_Y),
-           'Mixer': ('MY LIL MIXER', MIXER, mixer_extras, MIXER_ZONE_Y)}
+           'Mixer': ('MY LIL MIXER', MIXER, mixer_extras, MIXER_ZONE_Y),
+           'Duck': ('MY LIL DUCK', DUCK, duck_extras, DUCK_ZONE_Y)}
 EXTRA_CONSTS = {'Mixer': ['constexpr float STRIP_DX = %.2ff;   // strip column pitch: strip i sits at strip 0 + i * STRIP_DX' % STRIP_DX,
                           'constexpr int STRIPS = %d;   // strip count; Mixer.cpp static_asserts it equals mixer::numStrips' % len(MIX_X),
                           'constexpr float STRIP_FACE_R = %.3ff;   // a strip face\'s radius (TalkingFace); STRIP_FACEi is its centre' % RADIUS['face'],
