@@ -54,6 +54,7 @@ struct Duck : Module
     {
         Module::onReset (e);
         ducker.reset();
+        triggerMode = false;   // Initialize restores the follower, like the Mixer's SC IN
     }
 
     json_t* dataToJson() override
