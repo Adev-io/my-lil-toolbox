@@ -137,6 +137,20 @@ that show what reaches the audio interface. 34 HP.
 Patch idea: Drums kick into strip 1 and into SC, an acid line into strip 2 with DUCK at 70 %, a pad into strip 3 with
 SEND 1 into a reverb, the reverb back into RTN1, OUT L/R to the audio interface.
 
+## My lil Duck
+
+A sidechain ducker for audio that does not go through a Mixer strip (the Mixer's strips already duck on their own).
+Whenever **SC** is loud, or fires a trigger, IN L / IN R are pulled down. 12 HP.
+
+- **SC**: by default it follows the audio level (full effect at 5 V, 1 ms attack). Right-click, **SC IN reads**:
+  **Triggers** instead takes a rising edge (1 V on, 0.1 V off) as a full duck, the way a kick gate does. The setting is
+  saved with the patch. Nothing patched means no ducking.
+- **DEPTH** 0-100 % (default 80 %): how far a full envelope pulls the audio down. 100 % goes to silence.
+- **RELEASE** 20 ms-1 s (default 150 ms), log: how fast the audio comes back. It is the same taper as the Mixer's REL.
+- **IN L / OUT L** and **IN R / OUT R**: each side is polyphonic and keeps its channel count, and every channel gets
+  the same gain. One envelope drives both sides, so a stereo pair stays together. Leave R empty for mono.
+- **GR** light: brighter the more the audio is pulled down.
+
 ## Build
 
 MSYS2 mingw64 with the Rack SDK: `export RACK_DIR=/c/dev/Rack-SDK`, then `make test` (core checks), `make`,
